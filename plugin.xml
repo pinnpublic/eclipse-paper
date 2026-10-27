@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <extension point="org.eclipse.ui.startup">
+    <startup class="dev.eclipseline.Startup"/>
+  </extension>
+  <extension point="org.eclipse.core.runtime.preferences">
+    <initializer class="dev.eclipseline.PreferenceInitializer"/>
+  </extension>
+  <extension point="org.eclipse.ui.preferencePages">
+    <page id="dev.eclipseline.preferences" name="Paper / 노트 배경"
+      category="org.eclipse.ui.preferencePages.GeneralTextEditor"
+      class="dev.eclipseline.NotebookPreferencePage">
+      <keywordReference id="dev.eclipseline.keywords"/>
+    </page>
+  </extension>
+  <extension point="org.eclipse.ui.keywords">
+    <keyword id="dev.eclipseline.keywords" label="Paper notebook 노트 공책 모눈 배경 밑줄 lines grid paper"/>
+  </extension>
+</plugin>

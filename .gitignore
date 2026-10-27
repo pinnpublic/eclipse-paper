@@ -1,0 +1,32 @@
+# Generated build / test output
+/.build/
+/dist/
+/bin/
+/target/
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# Local release archives, raw verification history and environment notes
+/releases/
+/local/
+/ECLIPSE_DEVELOPMENT_HANDOFF.md
+
+# IDE workspace state and personal settings
+/.metadata/
+/.settings/
+/.idea/
+/.vscode/
+*.iml
+
+# OS / temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.bak
+*~
+
+# docs/updates contains the intentionally versioned p2 repository.
+# Do not ignore *.jar globally: Eclipse installs those published artifacts.

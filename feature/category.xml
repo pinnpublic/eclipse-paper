@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+  <feature url="features/dev.eclipseline.feature_1.3.5.jar" id="dev.eclipseline.feature" version="1.3.5">
+    <category name="notebook"/>
+  </feature>
+  <category-def name="notebook" label="Paper">
+    <description>Scalable notebook lines and paper backgrounds for source editors.</description>
+  </category-def>
+</site>

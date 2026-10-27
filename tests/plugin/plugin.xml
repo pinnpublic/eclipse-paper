@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+  <extension point="org.eclipse.ui.startup">
+    <startup class="dev.eclipseline.tests.RuntimeTests"/>
+  </extension>
+  <extension point="org.eclipse.ui.perspectives">
+    <perspective id="dev.eclipseline.tests.perspective" name="Notebook Test"
+      class="dev.eclipseline.tests.TestPerspective"/>
+  </extension>
+</plugin>

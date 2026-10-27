@@ -1,0 +1,22 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Paper
+Bundle-SymbolicName: dev.eclipseline;singleton:=true
+Bundle-Version: 1.3.5
+Bundle-Activator: dev.eclipseline.Activator
+Bundle-Vendor: pinnpublic
+Bundle-DocURL: https://github.com/pinnpublic/eclipse-paper
+Bundle-License: MIT;link="https://opensource.org/license/mit"
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-ActivationPolicy: lazy
+Import-Package: javax.imageio,
+ org.osgi.service.event
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.jface.text,
+ org.eclipse.ui.editors,
+ org.eclipse.ui.workbench.texteditor,
+ org.eclipse.e4.ui.css.swt.theme,
+ org.eclipse.e4.core.services
+Export-Package: dev.eclipseline
+

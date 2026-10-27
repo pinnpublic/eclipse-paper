@@ -1,0 +1,6 @@
+* text=auto
+*.png binary
+*.jar binary
+*.zip binary
+# JAR manifest sections end with a blank line.
+*.MF whitespace=-blank-at-eof
