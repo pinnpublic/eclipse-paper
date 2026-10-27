@@ -2,14 +2,13 @@
 
 ## 1.3.5
 
-- Public name: **Paper**. Existing bundle, feature and preference IDs are retained for upgrades.
+- Public name: **Paper**.
 - Added MIT license, user manual and Eclipse Marketplace publishing instructions.
-- Prepared a GitHub Pages p2 update site. Rendering behavior is unchanged from 1.3.4.
+- Added a GitHub Pages p2 update site.
 
 ## 1.3.4
 
 - Blend native line number antialiasing with the actual paper to reduce bright/dark fringes.
-- Preserve native fonts, baselines and ruler input.
 
 ## 1.3.3
 
@@ -21,5 +20,3 @@
 
 - Fix redundant background recreation and improve native ruler/lifecycle rendering.
 - Refresh the editor geometry and paper after a workbench restore.
-
-The local frozen v1.0 snapshot uses internal version 1.2.7 to preserve upgrade ordering.
