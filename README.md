@@ -2,6 +2,14 @@
 
 ## 설치
 
+### ZIP 파일
+
+[설치 ZIP 다운로드](https://github.com/pinnpublic/eclipse-paper/releases/download/v1.3.5/paper-update-site-1.3.5.zip) · [SHA-256](https://github.com/pinnpublic/eclipse-paper/releases/download/v1.3.5/paper-update-site-1.3.5.zip.sha256)
+
+1. **Help → Install New Software… → Add… → Archive…**를 엽니다.
+2. 다운로드한 `paper-update-site-1.3.5.zip`을 선택합니다.
+3. **Paper**를 설치하고 IDE를 재시작합니다.
+
 ### 업데이트 사이트
 
 1. **Help → Install New Software… → Add…**를 엽니다.
@@ -11,12 +19,6 @@
 ```text
 https://pinnpublic.github.io/eclipse-paper/updates/
 ```
-
-### ZIP 파일
-
-1. **Help → Install New Software… → Add… → Archive…**를 엽니다.
-2. `paper-update-site-1.3.5.zip`을 선택합니다.
-3. **Paper**를 설치하고 IDE를 재시작합니다.
 
 ## 설정 화면
 
