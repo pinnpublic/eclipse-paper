@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $classes = Join-Path $PSScriptRoot '.build\ruler-tests'
 New-Item -ItemType Directory -Force -Path $classes | Out-Null
-$classpath = (Join-Path $PSScriptRoot 'dist\dev.eclipseline_1.3.12.jar') + ';' + (Join-Path $EclipseHome 'plugins\*')
+$classpath = (Join-Path $PSScriptRoot 'dist\dev.eclipseline_1.3.13.jar') + ';' + (Join-Path $EclipseHome 'plugins\*')
 & (Join-Path $JdkHome 'bin\javac.exe') --release 11 -encoding UTF-8 -classpath $classpath -d $classes (Join-Path $PSScriptRoot 'tests\RulerPaintIsolationTest.java') (Join-Path $PSScriptRoot 'tests\ScrollResourceTest.java') (Join-Path $PSScriptRoot 'tests\RendererKeyTest.java') (Join-Path $PSScriptRoot 'tests\SynchronousScrollTest.java')
 if ($LASTEXITCODE -ne 0) { throw 'Paint ordering test compilation failed.' }
 & (Join-Path $JdkHome 'bin\javac.exe') --release 11 -encoding UTF-8 -classpath $classpath -d $classes (Join-Path $PSScriptRoot 'tests\RulerSmokeTest.java') (Join-Path $PSScriptRoot 'tests\StabilityAuditTest.java') (Join-Path $PSScriptRoot 'tests\ReviewRegressionTest.java') (Join-Path $PSScriptRoot 'tests\RulerMatteTest.java') (Join-Path $PSScriptRoot 'tests\RulerModelTest.java') (Join-Path $PSScriptRoot 'tests\ScrollAlignmentTest.java')

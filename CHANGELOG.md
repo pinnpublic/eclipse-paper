@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.13 — 2026-10-28
+
+- Keep the overview ruler and scrollbar surroundings in the editor's light/dark CSS theme color instead of inheriting the notebook paper background.
+- Reapply the overview background before native painting so window focus changes preserve the same solid color. Retain native annotations and input.
+- Restore previous overview backgrounds when decoration stops and release the paint filter and owned colors.
+
 ## 1.3.12 — 2026-10-28
 
 - Synchronize source and gutter painting during scrolling, including partial rows, wrapped Korean text and large fonts. Retain the previous complete gutter frame until the matching source frame is ready.

@@ -1,13 +1,13 @@
 # Paper 사용 매뉴얼
 
-Paper **1.3.12**는 스크롤 중 본문과 줄 번호의 가로줄이 어긋나는 문제를 수정하고, 이미지 변환과 버퍼 생성을 줄였습니다. 줄 번호·접기 영역에도 종이 배경을 연결하며, 오류 표시와 접기 기능은 유지합니다.
+Paper **1.3.13**은 스크롤바 오른쪽 표시 영역을 라이트·다크 테마의 기본 단색으로 유지합니다. 창 포커스가 바뀌어도 배경색이 달라지지 않으며, 본문과 줄 번호의 노트 배경·오류 표시·접기 기능은 유지합니다.
 
 ## 설치
 
 ### ZIP 파일
 
 1. **Help → Install New Software… → Add… → Archive…**를 엽니다.
-2. 다운로드한 `paper-update-site-1.3.12.zip`을 선택합니다.
+2. 다운로드한 `paper-update-site-1.3.13.zip`을 선택합니다.
 3. **Paper**를 설치하고 IDE를 재시작합니다.
 
 ### 업데이트 사이트
@@ -117,6 +117,6 @@ Eclipse 테마를 전환하면 해당 종이색이 적용됩니다. 선·무늬�
 
 ---
 
-버전 **1.3.12** · [MIT License](LICENSE) · [변경 내역](CHANGELOG.md) · [문의](https://github.com/pinnpublic/eclipse-paper/issues)
+버전 **1.3.13** · [MIT License](LICENSE) · [변경 내역](CHANGELOG.md) · [문의](https://github.com/pinnpublic/eclipse-paper/issues)
 
 [빌드·검사](DEVELOPMENT.md) · [Marketplace 등록](MARKETPLACE.md)

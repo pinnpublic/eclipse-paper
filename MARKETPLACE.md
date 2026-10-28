@@ -5,7 +5,7 @@
 1. `docs/updates/`를 포함해 GitHub `main` 브랜치에 push합니다.
 2. **Settings → Pages → Deploy from a branch → main → /docs → Save**를 설정합니다.
 3. Pages 배포 완료 후 Eclipse의 **Help → Install New Software… → Add…**에 다음 주소를 입력합니다.
-4. 목록에서 **Paper 1.3.12**를 선택해 설치합니다.
+4. 목록에서 **Paper 1.3.13**를 선택해 설치합니다.
 
 ```text
 https://pinnpublic.github.io/eclipse-paper/updates/
@@ -22,7 +22,7 @@ https://pinnpublic.github.io/eclipse-paper/updates/
 | 항목 | 값 |
 |---|---|
 | Name / Title | **Paper** |
-| Version | `1.3.12` |
+| Version | `1.3.13` |
 | Organization / Provider | `pinnpublic` |
 | License | **MIT License** |
 | Homepage / Source | `https://github.com/pinnpublic/eclipse-paper` |

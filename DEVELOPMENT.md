@@ -18,8 +18,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-update-site.ps1 -Ecl
 
 | 결과 | 경로 |
 |---|---|
-| 플러그인 JAR | `dist/dev.eclipseline_1.3.12.jar` |
-| 설치 ZIP | `dist/paper-update-site-1.3.12.zip` |
+| 플러그인 JAR | `dist/dev.eclipseline_1.3.13.jar` |
+| 설치 ZIP | `dist/paper-update-site-1.3.13.zip` |
 | SHA-256 | 각 파일의 `.sha256` |
 | 온라인 p2 저장소 | `docs/updates/` |
 

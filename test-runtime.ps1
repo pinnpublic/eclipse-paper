@@ -28,8 +28,8 @@ $platformClasspath = (Get-Content -LiteralPath (Join-Path $EclipseHome 'configur
         $path = if ($location -match '^file:') { ([Uri]$location).LocalPath } else { Join-Path $EclipseHome $location }
         $path.Replace('\', '/')
     }) -join ';'
-$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.12.jar'
-Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.12.jar') -Destination $mainJar
+$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.13.jar'
+Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.13.jar') -Destination $mainJar
 $argsForCompiler = @('--release', '11', '-encoding', 'UTF-8', '-d', ('"' + $classes.Replace('\', '/') + '"'),
     '-classpath', ('"' + $mainJar.Replace('\', '/') + ';' + $platformClasspath + '"'))
 $argsForCompiler += Get-ChildItem -LiteralPath (Join-Path $repoRoot 'tests\plugin\src') -Filter '*.java' -Recurse |
@@ -53,7 +53,7 @@ $bundleLines = Get-Content -LiteralPath (Join-Path $EclipseHome 'configuration\o
             $fields -join ','
         }
     }
-$bundleLines += 'dev.eclipseline,1.3.12,' + (ConvertTo-FileUri $mainJar) + ',4,false'
+$bundleLines += 'dev.eclipseline,1.3.13,' + (ConvertTo-FileUri $mainJar) + ',4,false'
 $bundleLines += 'dev.eclipseline.tests,1.0.0,' + (ConvertTo-FileUri $testJar) + ',4,false'
 $bundleInfo = Join-Path $configuration 'bundles.info'
 [IO.File]::WriteAllLines($bundleInfo, $bundleLines, [Text.UTF8Encoding]::new($false))

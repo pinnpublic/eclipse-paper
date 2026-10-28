@@ -746,13 +746,38 @@ public final class RuntimeTests implements IStartup {
         ImageData pixels=backdrop.getImageData(100);Rectangle bounds=host.getClientArea(),client=text.getClientArea();Point offset=display.map(text,host,0,0);
         check(pixels.width==bounds.width&&pixels.height==bounds.height,"backdrop covers the whole viewer rather than repeating a top strip on theme pass "+pass);
         int right=Math.min(bounds.width,offset.x+client.x+client.width),bottom=Math.min(bounds.height,offset.y+client.y+client.height);
-        RGB chrome=display.getSystemColor(SWT.COLOR_WIDGET_BACKGROUND).getRGB();boolean uniform=true;
+        RGB chrome=host.getParent().getBackground().getRGB();boolean uniform=true;
+        check(host.getBackground().getRGB().equals(chrome),"viewer children inherit theme chrome rather than paper on theme pass "+pass);
+        check(pass%2==1?chrome.red+chrome.green+chrome.blue<384:chrome.red+chrome.green+chrome.blue>=384,
+            "scrollbar surroundings follow the light/dark theme on pass "+pass+"; chrome="+chrome);
         for(int y=0;y<pixels.height&&uniform;y++)for(int x=0;x<pixels.width;x++)if((x>=right||y>=bottom)&&!pixels.palette.getRGB(pixels.getPixel(x,y)).equals(chrome)){uniform=false;break;}
         check(uniform,"all scrollbar-side corners and filler regions use native chrome on theme pass "+pass);
         PaperRenderer.Layout layout=field(surface,"lastLayout",PaperRenderer.Layout.class);
         ImageData paper=PaperRenderer.render(NotebookSettings.read(store),layout.forRuler(bounds.width,bounds.height,offset.x,offset.y),color,100);
         RGB first=pixels.palette.getRGB(pixels.getPixel(0,0)),expected=paper.palette.getRGB(paper.getPixel(0,0));
         check(first.equals(expected),"top/left paper uses the same coordinate origin as source on theme pass "+pass);
+        Shell workbench=host.getShell(),other=new Shell(display);
+        try {
+            other.setSize(180,100);other.open();other.forceActive();pump();
+            check(display.getActiveShell()==other,"editor loses window focus on theme pass "+pass);
+            overviewChromeTests(host,right,chrome,"inactive",pass);
+            workbench.forceActive();text.setFocus();pump();
+            check(display.getActiveShell()==workbench,"editor regains window focus on theme pass "+pass);
+            overviewChromeTests(host,right,chrome,"active",pass);
+        } finally {other.dispose();}
+    }
+    private void overviewChromeTests(Composite host,int right,RGB chrome,String focus,int pass)throws Exception {
+        int checked=0;
+        for(Control child:host.getChildren()) {
+            Rectangle bounds=child.getBounds();
+            if(bounds.x<right||bounds.width<=0||bounds.height<40)continue;
+            check(child.getBackground().getRGB().equals(chrome),focus+" overview inherits theme chrome on pass "+pass+"; control="+child+"; background="+child.getBackground().getRGB());
+            child.redraw();child.update();ImageData pixels=captureData(child);boolean solid=true;
+            for(int y=0;y<pixels.height&&solid;y++)for(int x=0;x<pixels.width;x++)
+                if(!pixels.palette.getRGB(pixels.getPixel(x,y)).equals(chrome)){solid=false;break;}
+            check(solid,focus+" empty overview paints solid theme chrome on pass "+pass);checked++;
+        }
+        check(checked>0,focus+" native overview canvas checked on pass "+pass);
     }
     private void openingTests(IWorkbenchPage page)throws Exception {
         new NotebookSettings(true,true,false,0,1,4,15,30,100,38,22,13,65,
