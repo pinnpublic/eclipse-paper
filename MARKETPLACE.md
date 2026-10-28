@@ -5,7 +5,7 @@
 1. `docs/updates/`를 포함해 GitHub `main` 브랜치에 push합니다.
 2. **Settings → Pages → Deploy from a branch → main → /docs → Save**를 설정합니다.
 3. Pages 배포 완료 후 Eclipse의 **Help → Install New Software… → Add…**에 다음 주소를 입력합니다.
-4. 목록에서 **Paper 1.3.5**를 선택해 설치합니다.
+4. 목록에서 **Paper 1.3.12**를 선택해 설치합니다.
 
 ```text
 https://pinnpublic.github.io/eclipse-paper/updates/
@@ -22,7 +22,7 @@ https://pinnpublic.github.io/eclipse-paper/updates/
 | 항목 | 값 |
 |---|---|
 | Name / Title | **Paper** |
-| Version | `1.3.5` |
+| Version | `1.3.12` |
 | Organization / Provider | `pinnpublic` |
 | License | **MIT License** |
 | Homepage / Source | `https://github.com/pinnpublic/eclipse-paper` |
@@ -61,6 +61,8 @@ Notebook paper backgrounds for Eclipse source editors.
 **License:** MIT.
 
 ## 다음 버전 배포
+
+같은 Update Site 주소를 유지하면 Pages의 p2 저장소가 새 설치 버전을 제공합니다. Marketplace 소개 페이지의 버전·설명·지원 Eclipse 버전은 GitHub README와 별개이므로 해당 등록 화면에서 갱신합니다.
 
 1. bundle·feature·category와 빌드·검사 스크립트의 버전을 갱신합니다.
 2. [빌드·검사 절차](DEVELOPMENT.md)를 실행합니다.

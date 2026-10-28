@@ -5,6 +5,8 @@ import java.util.function.Supplier;
 import org.eclipse.jface.text.ITextViewer;
 import org.eclipse.jface.text.source.IAnnotationModel;
 import org.eclipse.jface.text.source.IAnnotationModelListener;
+import org.eclipse.jface.text.source.IVerticalRulerColumn;
+import org.eclipse.jface.text.source.projection.ProjectionAnnotationModel;
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.*;
@@ -21,11 +23,14 @@ final class RulerPaper implements AutoCloseable {
     private final Listener refresh;
     private final Listener disposed=e->close();
     private final Map<Object,Supplier<IAnnotationModel>> sources=new IdentityHashMap<>();
+    private final Map<IVerticalRulerColumn,RulerModel> cleanModels=new IdentityHashMap<>();
     private final Set<IAnnotationModel> models=Collections.newSetFromMap(new IdentityHashMap<>());
     private final IAnnotationModelListener modelChanges=ignored->requestPaint();
     private final IPropertyChangeListener preferences=ignored->requestPaint();
     private org.eclipse.jface.preference.IPreferenceStore preferenceStore;
-    private Image paper;
+    private ImageData paper;
+    private Image frame,nativeImage;
+    private int nativeWidth,nativeHeight,nativeZoom;
     private PaperRenderer.Layout lastLayout;
     private NotebookSettings lastSettings;
     private RGB lastBackground;
@@ -52,6 +57,27 @@ final class RulerPaper implements AutoCloseable {
     }
     void watch(Object key,Supplier<IAnnotationModel> source){if(!sources.containsKey(key))sources.put(key,source);}
     void numbers(){smoothNumbers=true;}
+    private void syncModels(boolean enabled) {
+        for(Map.Entry<Object,Supplier<IAnnotationModel>> entry:sources.entrySet()) {
+            if(!(entry.getKey() instanceof IVerticalRulerColumn))continue;
+            IVerticalRulerColumn column=(IVerticalRulerColumn)entry.getKey();
+            IAnnotationModel current=entry.getValue().get();RulerModel installed=cleanModels.get(column);
+            if(installed!=null) {
+                if(current==installed) {
+                    if(enabled)continue;
+                    column.setModel(installed.original);
+                    if(entry.getValue().get()==installed)continue;
+                    current=installed.original;
+                }
+                cleanModels.remove(column);installed.close();
+            }
+            if(enabled&&current!=null&&!(current instanceof ProjectionAnnotationModel)&&!(current instanceof RulerModel)) {
+                RulerModel next=new RulerModel(current);column.setModel(next);
+                if(entry.getValue().get()==next)cleanModels.put(column,next);
+                else next.close();
+            }
+        }
+    }
     private void bindModels() {
         Set<IAnnotationModel> current=Collections.newSetFromMap(new IdentityHashMap<>());
         for(Supplier<IAnnotationModel> source:sources.values()){IAnnotationModel model=source.get();if(model!=null)current.add(model);}
@@ -67,20 +93,36 @@ final class RulerPaper implements AutoCloseable {
         Rectangle bounds=((Composite)control).getClientArea();
         if(!overlay.getBounds().equals(bounds))overlay.setBounds(bounds);
         boolean visible=owner.currentSettings().enabled;
+        syncModels(visible);
         if(overlay.getVisible()!=visible)overlay.setVisible(visible);
+        if(!visible&&frame!=null){frame.dispose();frame=null;}
         if(visible)overlay.redraw();
+    }
+    void scrolled() {
+        if(closed||control.isDisposed())return;
+        refresh();
+        if(!overlay.isDisposed()&&overlay.isVisible())overlay.update();
     }
     private void paint(GC output) {
         if(closed||painting||capturing||!owner.currentSettings().enabled)return;painting=true;
         try {
             Rectangle bounds=((Composite)control).getClientArea();if(bounds.width<=0||bounds.height<=0)return;
+            // If this column paints first, keep the entire previous scene (digits too).
+            // The source paint will synchronously commit the next scene to every gutter.
+            if(frame!=null&&!owner.isRulerFrameCurrent()){output.drawImage(frame,0,0);return;}
             PaperRenderer.Layout layout=owner.rulerLayout(control);if(layout==null)return;
-            bindModels();NotebookSettings settings=owner.currentSettings();RGB background=owner.currentBackground();int zoom=control.getMonitor().getZoom();
-            if(paper==null||!layout.equals(lastLayout)||settings!=lastSettings||!background.equals(lastBackground)||zoom!=lastZoom) {
-                Image next=new Image(display,(ImageDataProvider) z->PaperRenderer.render(settings,layout,background,z));
-                if(paper!=null)paper.dispose();paper=next;lastLayout=layout;lastSettings=settings;lastBackground=background;lastZoom=zoom;
+            syncModels(true);bindModels();NotebookSettings settings=owner.currentSettings();RGB background=owner.currentBackground();int zoom=control.getMonitor().getZoom();
+            PaperRenderer.Layout key=layout.fullKey(settings);
+            if(paper==null||!key.equals(lastLayout)||settings!=lastSettings||!background.equals(lastBackground)||zoom!=lastZoom) {
+                paper=PaperRenderer.render(settings,layout,background,zoom);
+                lastLayout=key;lastSettings=settings;lastBackground=background;lastZoom=zoom;
             }
-            Image nativeImage=new Image(display,bounds.width,bounds.height);GC nativeGC=null;
+            if(nativeImage==null||nativeWidth!=bounds.width||nativeHeight!=bounds.height||nativeZoom!=zoom) {
+                Image next=new Image(display,bounds.width,bounds.height);
+                if(nativeImage!=null)nativeImage.dispose();nativeImage=next;
+                nativeWidth=bounds.width;nativeHeight=bounds.height;nativeZoom=zoom;
+            }
+            GC nativeGC=null;
             try {
                 nativeGC=new GC(nativeImage);
                 // Invoke the native canvas painters with an offscreen GC. Control.print includes
@@ -88,13 +130,17 @@ final class RulerPaper implements AutoCloseable {
                 nativeGC.setBackground(control.getBackground());nativeGC.fillRectangle(bounds);
                 Event paint=new Event();paint.gc=nativeGC;paint.width=bounds.width;paint.height=bounds.height;
                 capturing=true;try {control.notifyListeners(SWT.Paint,paint);}finally{capturing=false;}
-                ImageData nativePixels=nativeImage.getImageData(zoom),result=(ImageData)paper.getImageData(zoom).clone();
+                ImageData nativePixels=nativeImage.getImageData(zoom),result=(ImageData)paper.clone();
                 composite(nativePixels,result,smoothNumbers?control.getForeground().getRGB():null);
                 Image combined=new Image(display,(ImageDataProvider) z->z==zoom?result:result.scaledTo(
                     Math.max(1,(int)Math.round(layout.width*z/100.0)),Math.max(1,(int)Math.round(layout.height*z/100.0))));
-                try {output.drawImage(combined,0,0);}
-                finally {combined.dispose();}
-            } finally {if(nativeGC!=null)nativeGC.dispose();nativeImage.dispose();}
+                boolean retained=false;
+                try {
+                    output.drawImage(combined,0,0);
+                    Image previous=frame;frame=combined;retained=true;
+                    if(previous!=null)previous.dispose();
+                } finally {if(!retained)combined.dispose();}
+            } finally {if(nativeGC!=null)nativeGC.dispose();}
         } finally {painting=false;}
     }
     private static void composite(ImageData nativePixels,ImageData paper) {
@@ -185,9 +231,11 @@ final class RulerPaper implements AutoCloseable {
     }
     @Override public void close() {
         if(closed)return;closed=true;
+        if(!control.isDisposed())syncModels(false);
+        for(RulerModel model:cleanModels.values())model.close();cleanModels.clear();
         for(IAnnotationModel model:models)model.removeAnnotationModelListener(modelChanges);models.clear();sources.clear();
         if(preferenceStore!=null)preferenceStore.removePropertyChangeListener(preferences);
-        if(paper!=null)paper.dispose();if(!overlay.isDisposed())overlay.dispose();
+        paper=null;if(nativeImage!=null)nativeImage.dispose();if(frame!=null)frame.dispose();if(!overlay.isDisposed())overlay.dispose();
         if(!control.isDisposed()){
             control.removeListener(SWT.Paint,refresh);control.removeListener(SWT.Resize,refresh);
             control.removeListener(SWT.Dispose,disposed);

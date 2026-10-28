@@ -66,6 +66,8 @@ public final class RuntimeTests implements IStartup {
         IWorkbench workbench = PlatformUI.getWorkbench();
         if (workbench.getIntroManager().getIntro() != null) workbench.getIntroManager().closeIntro(workbench.getIntroManager().getIntro());
         IWorkbenchPage page = workbench.showPerspective("dev.eclipseline.tests.perspective", workbench.getActiveWorkbenchWindow());
+        if(Boolean.getBoolean("notebook.test.scrollOnly")){wheelTests(page);if(!Boolean.getBoolean("notebook.test.gutterOnly")&&!Boolean.getBoolean("notebook.test.themeOnly"))return;}
+        if(Boolean.getBoolean("notebook.test.gutterOnly")){gutterTests(page);if(Boolean.getBoolean("notebook.test.themeOnly"))themeTests(page);return;}
         if(Boolean.getBoolean("notebook.test.themeOnly")){themeTests(page);return;}
         if(Boolean.getBoolean("notebook.test.openingOnly")){openingTests(page);return;}
         check(NotebookSettings.LINE_NAMES.length == 10 && NotebookSettings.PAPER_NAMES.length == 12, "10 line styles and 12 paper patterns available");
@@ -153,6 +155,172 @@ public final class RuntimeTests implements IStartup {
         defaults.write(store); pump();
         openingTests(page);
         themeTests(page);
+        gutterTests(page);
+    }
+
+    private void wheelTests(IWorkbenchPage page)throws Exception {
+        NotebookSettings before=NotebookSettings.read(store);
+        String fontKey=org.eclipse.jface.resource.JFaceResources.TEXT_FONT;
+        FontData[] originalFont=org.eclipse.jface.resource.JFaceResources.getFontRegistry().getFontData(fontKey);
+        IProject project=ResourcesPlugin.getWorkspace().getRoot().getProject("NativeWheelRegression");project.create(null);project.open(null);
+        StringBuilder content=new StringBuilder();for(int i=1;i<=350;i++)content.append(String.format("%03d  native wheel source row %03d%n",i,i));
+        IFile file=file(project,"long-wheel-document.txt",content.toString());
+        store.setValue(NotebookSettings.PREFIX+"theme",false);store.setValue(NotebookSettings.PREFIX+"texture",14);
+        org.eclipse.jface.preference.PreferenceConverter.setValue(store,NotebookSettings.PREFIX+"paperColor",new RGB(247,244,233));Activator.getDefault().decorator().refreshSettings();
+        try {
+            for(int size:new int[]{22,32}) {
+                org.eclipse.jface.resource.JFaceResources.getFontRegistry().put(fontKey,new FontData[]{new FontData("Consolas",size,SWT.NORMAL)});
+                IEditorPart editor=page.openEditor(new FileEditorInput(file),EditorsUI.DEFAULT_TEXT_EDITOR_ID);StyledText text=widget(editor);await(()->attached(text));pump();
+                try {
+                    org.eclipse.jface.text.source.CompositeRuler ruler=(org.eclipse.jface.text.source.CompositeRuler)editor.getAdapter(org.eclipse.jface.text.source.IVerticalRulerInfo.class);
+                    Control number=null;java.util.Iterator<org.eclipse.jface.text.source.IVerticalRulerColumn> columns=ruler.getDecoratorIterator();
+                    while(columns.hasNext()) {
+                        org.eclipse.jface.text.source.IVerticalRulerColumn column=columns.next();
+                        if(column instanceof org.eclipse.ui.texteditor.rulers.IContributedRulerColumn&&"org.eclipse.ui.editors.columns.linenumbers".equals(((org.eclipse.ui.texteditor.rulers.IContributedRulerColumn)column).getDescriptor().getId()))number=column.getControl();
+                    }
+                    check(number!=null,"native wheel test has a line-number ruler; font="+size);
+                    Control overlay=(Control)number.getData("dev.eclipseline.rulerOverlay");int row=text.getLineHeight()+text.getLineSpacing(),step=0;
+                    for(int start:new int[]{0,1,row/2+3,row*20+row/2,row*110+3}) {
+                        text.setTopPixel(start);pump();
+                        for(int delta:new int[]{-120,-120,-240,120,-360,240,120}) {
+                            Point point=text.toDisplay(100,80);long coordinates=(point.x&0xffffL)|((point.y&0xffffL)<<16);
+                            org.eclipse.swt.internal.win32.OS.SendMessage(text.handle,org.eclipse.swt.internal.win32.OS.WM_MOUSEWHEEL,(long)delta<<16,coordinates);pump();
+                            assertWheelBaselines(text,overlay,size,step++);
+                        }
+                    }
+                    captureTree(text.getParent(),"wheel-font-"+size+".png");check(!editor.isDirty()&&document(editor).get().equals(content.toString()),"native wheel scrolling preserves the document; font="+size);
+                } finally {page.closeEditor(editor,false);}
+            }
+        } finally {before.write(store);Activator.getDefault().decorator().refreshSettings();org.eclipse.jface.resource.JFaceResources.getFontRegistry().put(fontKey,originalFont);pump();}
+    }
+    private void assertWheelBaselines(StyledText text,Control overlay,int font,int step)throws Exception {
+        ImageData numbers=captureData(overlay),source=captureData(text);NotebookSurface surface=(NotebookSurface)text.getData(NotebookSurface.DATA_KEY);
+        PaperRenderer.Layout layout=field(surface,"lastLayout",PaperRenderer.Layout.class);Point shift=display.map(text,overlay.getParent(),0,0);Point size=overlay.getSize();
+        NotebookSettings settings=NotebookSettings.read(store);RGB background=text.getBackground().getRGB();
+        ImageData numberPaper=PaperRenderer.render(settings,layout.forRuler(size.x,size.y,shift.x,shift.y),background,100),sourcePaper=PaperRenderer.render(settings,layout,background,100);
+        int first=text.getLineIndex(0);if(text.getLinePixel(first)<0)first++;
+        for(int line=first;line<Math.min(text.getLineCount(),first+4);line++) {
+            int top=text.getLocationAtOffset(text.getOffsetAtLine(line)).y,height=text.getLineHeight();
+            int a=wheelInkBottom(numbers,numberPaper,top+shift.y,height,numbers.width)-shift.y,b=wheelInkBottom(source,sourcePaper,top,height,Math.min(50,source.width));
+            if(a<0||b<0||Math.abs(a-b)>1) {
+                save(numbers,"wheel-mismatch-numbers.png");save(source,"wheel-mismatch-source.png");
+                throw new AssertionError("Wheel baseline mismatch: font="+font+", step="+step+", line="+(line+1)+", topPixel="+text.getTopPixel()+", numbers="+a+", source="+b);
+            }
+        }
+        check(true,"native wheel keeps source/ruler baselines; font="+font+", step="+step+", top="+text.getTopPixel());
+    }
+    private static int wheelInkBottom(ImageData actual,ImageData paper,int top,int height,int width) {
+        int bottom=-1;for(int y=Math.max(0,top);y<Math.min(Math.min(actual.height,paper.height),top+height);y++)for(int x=0;x<Math.min(width,paper.width);x++) {
+            RGB a=actual.palette.getRGB(actual.getPixel(x,y)),b=paper.palette.getRGB(paper.getPixel(x,y));if(Math.abs(a.red-b.red)+Math.abs(a.green-b.green)+Math.abs(a.blue-b.blue)>100)bottom=y;
+        }return bottom;
+    }
+
+    private void gutterTests(IWorkbenchPage page)throws Exception {
+        IProject project=ResourcesPlugin.getWorkspace().getRoot().getProject("GutterRegression");
+        project.create(null);project.open(null);
+        IProjectDescription description=project.getDescription();description.setNatureIds(new String[]{"org.eclipse.jdt.core.javanature"});project.setDescription(description,null);
+        EditorsUI.getPreferenceStore().setValue(org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceConstants.QUICK_DIFF_ALWAYS_ON,true);
+        EditorsUI.getPreferenceStore().setValue(org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceConstants.SHOW_RANGE_INDICATOR,true);
+        String source="public class GutterExample {\n    int count = 1;\n\n    public void first() {\n        count++;\n        count++;\n    }\n\n    public void second() {\n        count--;\n        count--;\n    }\n}\n";
+        FontData[] originalFont=org.eclipse.jface.resource.JFaceResources.getFontRegistry().getFontData("org.eclipse.jdt.ui.editors.textfont");
+        org.eclipse.jface.resource.JFaceResources.getFontRegistry().put("org.eclipse.jdt.ui.editors.textfont",new FontData[]{new FontData("Consolas",22,SWT.NORMAL)});
+        IFile file=file(project,"GutterExample.java",source);
+        IEditorPart editor=page.openEditor(new FileEditorInput(file),"org.eclipse.jdt.ui.CompilationUnitEditor");
+        StyledText text=widget(editor);await(()->attached(text));
+        store.setValue(NotebookSettings.PREFIX+"theme",false);
+        org.eclipse.jface.preference.PreferenceConverter.setValue(store,NotebookSettings.PREFIX+"paperColor",new RGB(235,226,205));
+        store.setValue(NotebookSettings.PREFIX+"texture",22);Activator.getDefault().decorator().refreshSettings();pump();
+        Font font=new Font(display,"Consolas",22,SWT.NORMAL);text.setFont(font);pump();
+        try {
+            org.eclipse.jface.text.source.CompositeRuler ruler=(org.eclipse.jface.text.source.CompositeRuler)editor.getAdapter(org.eclipse.jface.text.source.IVerticalRulerInfo.class);
+            ruler.setFont(font);text.getParent().layout(true,true);pump();
+            Map<org.eclipse.jface.text.source.IVerticalRulerColumn,org.eclipse.jface.text.source.IAnnotationModel> originals=new IdentityHashMap<>();
+            for(int pass=0;pass<4;pass++) {
+                if(pass==1)text.setSelection(text.getOffsetAtLine(3),text.getOffsetAtLine(8));
+                if(pass==2){document(editor).replace(text.getOffsetAtLine(4),0,"        count += 2;\n");text.setSelection(text.getOffsetAtLine(9));}
+                if(pass==3)document(editor).replace(text.getOffsetAtLine(5),text.getOffsetAtLine(7)-text.getOffsetAtLine(5),"");
+                text.redraw();pump();
+                captureTree(text.getParent(),"gutter-pass-"+pass+".png");
+                java.util.Iterator<org.eclipse.jface.text.source.IVerticalRulerColumn> columns=ruler.getDecoratorIterator();int index=0;
+                while(columns.hasNext()) {
+                    org.eclipse.jface.text.source.IVerticalRulerColumn column=columns.next();Control control=column.getControl();
+                    results.add("INFO: gutter "+pass+"/"+index+" "+column.getClass().getName()+" bounds="+control.getBounds()+" background="+control.getBackground().getRGB()+" foreground="+control.getForeground().getRGB());
+                    Rectangle area=((Composite)control).getClientArea();
+                    if(area.width>0&&area.height>0){
+                        Image nativeImage=new Image(display,area.width,area.height);GC gc=new GC(nativeImage);
+                        try {
+                            gc.setBackground(control.getBackground());gc.fillRectangle(area);Event paint=new Event();paint.gc=gc;paint.width=area.width;paint.height=area.height;control.notifyListeners(SWT.Paint,paint);
+                            ImageData nativePixels=nativeImage.getImageData();save(nativePixels,"gutter-native-"+pass+"-"+index+".png");
+                            if(column instanceof org.eclipse.ui.texteditor.rulers.IContributedRulerColumn&&"org.eclipse.ui.editors.columns.linenumbers".equals(((org.eclipse.ui.texteditor.rulers.IContributedRulerColumn)column).getDescriptor().getId())) {
+                                boolean clean=true;int run=0,longest=0;RGB background=control.getBackground().getRGB(),ink=control.getForeground().getRGB();
+                                for(int y=0;y<nativePixels.height;y++) {
+                                    RGB pixel=nativePixels.palette.getRGB(nativePixels.getPixel(nativePixels.width-1,y));
+                                    run=pixel.equals(background)?0:run+1;longest=Math.max(longest,run);
+                                    if(pixel.red<ink.red-8||pixel.green<ink.green-8||pixel.blue<ink.blue-8)clean=false;
+                                }
+                                clean&=longest<text.getLineHeight()/2;
+                                check(clean,"line number background has no Quick Diff blocks or deletion strokes; pass="+pass);
+                            }
+                        }
+                        finally {gc.dispose();nativeImage.dispose();}
+                    }
+                    if(column instanceof org.eclipse.jface.text.source.IVerticalRulerInfoExtension) {
+                        org.eclipse.jface.text.source.IAnnotationModel model=((org.eclipse.jface.text.source.IVerticalRulerInfoExtension)column).getModel();
+                        if(model!=null&&model.getClass().getName().equals("dev.eclipseline.RulerModel")) {
+                            org.eclipse.jface.text.source.IAnnotationModel original=field(model,"original",org.eclipse.jface.text.source.IAnnotationModel.class);originals.putIfAbsent(column,original);
+                            boolean clean=true;java.util.Iterator<org.eclipse.jface.text.source.Annotation> annotations=model.getAnnotationIterator();
+                            while(annotations.hasNext())if(annotations.next() instanceof org.eclipse.ui.texteditor.DefaultRangeIndicator)clean=false;
+                            check(clean,"paper ruler excludes native blue range indicators; pass="+pass+", column="+index);
+                        }
+                    }
+                    if(column.getClass().getName().endsWith(".ProjectionRulerColumn")) {
+                        Control overlay=(Control)control.getData("dev.eclipseline.rulerOverlay");
+                        check(overlay!=null&&overlay.isVisible(),"folding gutter has paper during selection/edit pass "+pass);
+                        NotebookSurface surface=(NotebookSurface)text.getData(NotebookSurface.DATA_KEY);
+                        PaperRenderer.Layout layout=field(surface,"lastLayout",PaperRenderer.Layout.class);Point shift=display.map(text,control,0,0);
+                        ImageData expected=PaperRenderer.render(NotebookSettings.read(store),layout.forRuler(area.width,area.height,shift.x,shift.y),text.getBackground().getRGB(),100);
+                        ImageData actual=captureData(overlay);int y=area.height-6;
+                        for(int x=1;x<area.width-1;x++)check(actual.palette.getRGB(actual.getPixel(x,y)).equals(expected.palette.getRGB(expected.getPixel(x,y))),
+                            "folding gutter continues the exact paper texture; pass="+pass+", x="+x);
+                    }
+                    index++;
+                }
+            }
+            check(originals.size()>=2,"both number and annotation gutters use clean models");
+            check(EditorsUI.getPreferenceStore().getBoolean(org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceConstants.QUICK_DIFF_ALWAYS_ON)
+                &&EditorsUI.getPreferenceStore().getBoolean(org.eclipse.ui.texteditor.AbstractDecoratedTextEditorPreferenceConstants.SHOW_RANGE_INDICATOR),"clean paper leaves both user indicator preferences enabled");
+            store.setValue(NotebookSettings.PREFIX+"enabled",false);Activator.getDefault().decorator().refreshSettings();pump();
+            for(Map.Entry<org.eclipse.jface.text.source.IVerticalRulerColumn,org.eclipse.jface.text.source.IAnnotationModel> entry:originals.entrySet())
+                check(((org.eclipse.jface.text.source.IVerticalRulerInfoExtension)entry.getKey()).getModel()==entry.getValue(),"disabling paper restores the original native ruler model");
+            captureTree(text.getParent(),"gutter-paper-disabled.png");
+            store.setValue(NotebookSettings.PREFIX+"enabled",true);Activator.getDefault().decorator().refreshSettings();pump();
+            captureTree(text.getParent(),"gutter-paper-reenabled.png");
+            org.eclipse.jface.text.ITextViewer viewer=(org.eclipse.jface.text.ITextViewer)editor.getAdapter(ITextOperationTarget.class);
+            org.eclipse.jface.text.source.projection.ProjectionViewer projection=(org.eclipse.jface.text.source.projection.ProjectionViewer)viewer;
+            org.eclipse.jface.text.source.projection.ProjectionAnnotationModel model=projection.getProjectionAnnotationModel();
+            java.util.Iterator<org.eclipse.jface.text.source.Annotation> annotations=model.getAnnotationIterator();
+            check(annotations.hasNext(),"native Java folding annotations are available");
+            org.eclipse.jface.text.source.projection.ProjectionAnnotation fold=(org.eclipse.jface.text.source.projection.ProjectionAnnotation)annotations.next();
+            int modelLine=document(editor).getLineOfOffset(model.getPosition(fold).offset);
+            int widgetLine=org.eclipse.jface.text.JFaceTextUtil.modelLineToWidgetLine(viewer,modelLine);
+            java.util.Iterator<org.eclipse.jface.text.source.IVerticalRulerColumn> columns=ruler.getDecoratorIterator();
+            while(columns.hasNext()) {
+                org.eclipse.jface.text.source.IVerticalRulerColumn column=columns.next();
+                if(!column.getClass().getName().endsWith(".ProjectionRulerColumn"))continue;
+                Control control=column.getControl(),overlay=(Control)control.getData("dev.eclipseline.rulerOverlay");
+                Point shift=display.map(text,control,0,0);int before=text.getLineCount();
+                for(int click=0;click<2;click++) {
+                    for(int type:new int[]{SWT.MouseDown,SWT.MouseUp}) {
+                        Event event=new Event();event.button=1;event.x=control.getSize().x/2;
+                        event.y=shift.y+text.getLinePixel(widgetLine)+text.getLineHeight()/2;overlay.notifyListeners(type,event);
+                    }
+                    pump();
+                    check(fold.isCollapsed()==(click==0),"native folding responds to paper overlay click "+click);
+                }
+                check(text.getLineCount()==before,"expanding restores all source lines");
+            }
+            check(editor.isDirty(),"editing remains managed by the native editor");
+        } finally {page.closeEditor(editor,false);font.dispose();org.eclipse.jface.resource.JFaceResources.getFontRegistry().put("org.eclipse.jdt.ui.editors.textfont",originalFont);}
     }
 
     private boolean preferenceRegistered() {
@@ -539,7 +707,18 @@ public final class RuntimeTests implements IStartup {
         NotebookSurface surface=(NotebookSurface)text.getData(NotebookSurface.DATA_KEY);
         pump();Rectangle original=text.getBounds();
         Image body=text.getBackgroundImage(),frame=host.getBackgroundImage();
-        for(int i=0;i<50;i++)surface.prepare();
+        PaperRenderer.Layout beforePrepare=field(surface,"lastLayout",PaperRenderer.Layout.class);
+        String beforeCache=cacheDiagnostic(surface);
+        for(int i=0;i<50;i++) {
+            surface.prepare();
+            if(body!=text.getBackgroundImage()||frame!=host.getBackgroundImage()) {
+                PaperRenderer.Layout afterPrepare=field(surface,"lastLayout",PaperRenderer.Layout.class);
+                results.add("INFO: prepare-cache change iteration="+i+", body="+(body!=text.getBackgroundImage())+", host="+(frame!=host.getBackgroundImage())
+                    +", before="+layoutDiagnostic(beforePrepare)+", after="+layoutDiagnostic(afterPrepare)
+                    +", cacheBefore="+beforeCache+", cacheAfter="+cacheDiagnostic(surface));
+                break;
+            }
+        }
         check(body==text.getBackgroundImage()&&frame==host.getBackgroundImage(),mode+": unchanged prepare retains image caches");
         for(int cycle=0;cycle<4;cycle++) {
             shell.setMinimized(true);pump();shell.setMinimized(false);pump();pump();
@@ -548,6 +727,18 @@ public final class RuntimeTests implements IStartup {
             rulerTests(editor,text);
         }
         check(content.equals(document(editor).get())&&!editor.isDirty(),mode+": restore preserves source and dirty state");
+    }
+    private static String layoutDiagnostic(PaperRenderer.Layout l) {
+        if(l==null)return "null";
+        return l.width+"x"+l.height+" font="+l.fontHeight+" row="+l.rowHeight+" origin="+l.originY+" first="+(l.rules.length==0?"none":l.rules[0])
+            +" highlight="+(l.highlight==null?"none":l.highlight.top+":"+l.highlight.bottom+":"+l.highlight.color);
+    }
+    private String cacheDiagnostic(NotebookSurface surface)throws Exception {
+        Object padding=field(surface,"padding",Object.class);
+        return "background="+field(surface,"lastBackground",Object.class)+",zoom="+field(surface,"lastZoom",Object.class)
+            +",settings="+System.identityHashCode(field(surface,"lastSettings",Object.class))
+            +",padding="+(padding==null?"none":layoutDiagnostic(field(padding,"lastLayout",PaperRenderer.Layout.class))+":"
+                +field(padding,"lastColor",Object.class)+":"+field(padding,"lastChrome",Object.class)+":"+field(padding,"lastPage",Object.class));
     }
     private void frameSeamTests(ITextViewer viewer,StyledText text,NotebookSurface surface,RGB color,int pass)throws Exception {
         Composite host=(Composite)((org.eclipse.jface.viewers.Viewer)viewer).getControl();

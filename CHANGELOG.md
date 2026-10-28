@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.12 — 2026-10-28
+
+- Synchronize source and gutter painting during scrolling, including partial rows, wrapped Korean text and large fonts. Retain the previous complete gutter frame until the matching source frame is ready.
+- Extend paper through line number, annotation and folding gutters. Hide Quick Diff backgrounds and range stripes while preserving diagnostics, folding and native input.
+- Reuse unchanged paper and rule images, emit bitmap formats accepted directly by Win32 SWT, and reuse gutter capture buffers.
+- Preserve existing paper colors, transparency and line geometry; verify 2,880 old/new RGB and alpha raster comparisons.
+- In a controlled 80-frame workload, median frame time decreased from 46.530ms in 1.3.11 to 29.034ms in 1.3.12. This measures the test viewer, not overall IDE performance.
+- Validate 288 runtime checks each on STS3 / Eclipse 4.21 / Java 11, STS5 / Eclipse 4.40 / Java 21, and Eclipse 2026-09 / 4.41 / Java 21, plus native wheel, paint-order, rendering and resource regressions.
+
 ## 1.3.5
 
 - Public name: **Paper**.

@@ -12,6 +12,7 @@ replay_pid*
 /releases/
 /local/
 /ECLIPSE_DEVELOPMENT_HANDOFF.md
+/WORK_LOG.md
 
 # IDE workspace state and personal settings
 /.metadata/

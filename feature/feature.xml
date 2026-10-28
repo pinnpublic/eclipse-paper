@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feature id="dev.eclipseline.feature" label="Paper"
-    version="1.3.5" provider-name="pinnpublic">
+    version="1.3.12" provider-name="pinnpublic">
   <description>Notebook rules, grids and paper textures for Eclipse source editors. Configure Paper in Preferences.</description>
   <copyright>Copyright (c) 2026 pinnpublic</copyright>
   <license url="https://github.com/pinnpublic/eclipse-paper/blob/main/LICENSE">MIT License
@@ -25,5 +25,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.</license>
   <url><update label="Paper Updates" url="https://pinnpublic.github.io/eclipse-paper/updates/"/></url>
-  <plugin id="dev.eclipseline" download-size="0" install-size="0" version="1.3.5" unpack="false"/>
+  <plugin id="dev.eclipseline" download-size="0" install-size="0" version="1.3.12" unpack="false"/>
 </feature>

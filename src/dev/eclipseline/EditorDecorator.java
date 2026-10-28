@@ -199,7 +199,8 @@ public final class EditorDecorator implements AutoCloseable {
                             || column instanceof org.eclipse.ui.texteditor.rulers.IContributedRulerColumn
                             && "org.eclipse.ui.editors.columns.linenumbers".equals(((org.eclipse.ui.texteditor.rulers.IContributedRulerColumn)column).getDescriptor().getId()))
                             surface.attachRuler(column,target instanceof ITextViewer?(ITextViewer)target:null);
-                        else if(column.getClass()==org.eclipse.jface.text.source.AnnotationRulerColumn.class
+                        // Projection/folding columns also extend AnnotationRulerColumn.
+                        else if(column instanceof org.eclipse.jface.text.source.AnnotationRulerColumn
                             || column instanceof org.eclipse.ui.texteditor.rulers.IContributedRulerColumn
                             && "org.eclipse.ui.editors.columns.annotations".equals(((org.eclipse.ui.texteditor.rulers.IContributedRulerColumn)column).getDescriptor().getId()))
                             surface.attachAnnotations(column,target instanceof ITextViewer?(ITextViewer)target:null);

@@ -29,11 +29,17 @@ public final class NotebookSurface implements AutoCloseable {
     private int originalSpacing, appliedSpacing = -1;
     private int originalTopMargin, appliedTopMargin = -1;
     private NotebookPadding padding;
-    private PaperRenderer.Layout lastLayout;
+    private PaperRenderer.Layout lastLayout; // Prepared geometry for diagnostics, never a ruler snapshot.
+    private PaperRenderer.Layout synchronizedLayout;
+    private PaperRenderer.Layout backgroundKey, rulesKey;
     private NotebookSettings lastSettings;
     private RGB lastBackground;
     private int lastZoom;
     private boolean closed, preparing, disposing;
+    private org.eclipse.jface.text.ITextViewer viewer;
+    private final org.eclipse.jface.text.IViewportListener viewport=ignored->scheduleScroll();
+    private final Listener scroll=ignored->scheduleScroll();
+    private int synchronizedTop,synchronizedLeft;
     private final Listener paintFilter;
     private final Listener rulesPainter;
     private final Listener disposeListener = event -> { disposing = true; close(); };
@@ -62,26 +68,49 @@ public final class NotebookSurface implements AutoCloseable {
         paintFilter = event -> { if (event.widget == text) prepare(); };
         rulesPainter = event -> {
             if (rulesImage != null && !rulesImage.isDisposed()) event.gc.drawImage(rulesImage, 0, 0);
+            // Complete the gutter frame before returning this source paint to the event loop.
+            // A queued scroll callback leaves the new source beside the previous gutter.
+            if(!closed&&lastLayout!=null&&settings.get().enabled) {
+                int top=text.getTopPixel(),left=text.getHorizontalPixel();
+                if(top!=synchronizedTop||left!=synchronizedLeft||!lastLayout.equals(synchronizedLayout)) {
+                    synchronizedTop=top;synchronizedLeft=left;synchronizedLayout=lastLayout;
+                    for(RulerPaper ruler:rulers.values())ruler.scrolled();
+                }
+            }
         };
         originalBackground = text.getBackground(); originalImage = text.getBackgroundImage();
         originalSpacing = text.getLineSpacing();
         originalTopMargin = text.getTopMargin();
+        synchronizedTop=text.getTopPixel();synchronizedLeft=text.getHorizontalPixel();
         text.setData(DATA_KEY, this);
         text.getDisplay().addFilter(SWT.Paint, paintFilter);
         text.addListener(SWT.Dispose, disposeListener);
         text.addListener(SWT.Paint, rulesPainter);
+        text.addListener(SWT.MouseWheel,scroll);text.addListener(SWT.MouseHorizontalWheel,scroll);
+        if(text.getVerticalBar()!=null)text.getVerticalBar().addListener(SWT.Selection,scroll);
+        if(text.getHorizontalBar()!=null)text.getHorizontalBar().addListener(SWT.Selection,scroll);
         if (alignHighlight) text.addLineBackgroundListener(lineBackground);
         prepare();
     }
 
     public void refresh() {
-        lastLayout = null;
-        if (!closed && !text.isDisposed()) { prepare(); text.redraw(); }
+        if (!closed && !text.isDisposed()) {
+            synchronizedLayout=null;
+            prepare();text.redraw();
+            for(RulerPaper ruler:rulers.values())ruler.refresh();
+        }
     }
     public void restored() {
         if(closed||text.isDisposed())return;
         if(padding!=null)padding.restored();refresh();
         for(RulerPaper ruler:rulers.values())ruler.refresh();
+    }
+
+    private void scheduleScroll() {
+        if(closed||text.isDisposed()||!settings.get().enabled)return;
+        // SWT applies the native wheel action after its listeners. Invalidate only;
+        // the resulting source paint synchronizes all gutters at the final viewport.
+        text.redraw();
     }
 
     public void prepare() {
@@ -102,6 +131,7 @@ public final class NotebookSurface implements AutoCloseable {
             if (ownedBackground != null && !ownedBackground.equals(text.getBackground()))
                 originalBackground = text.getBackground();
             if (!s.enabled) { restore(); lastSettings = s; return; }
+            if(lastSettings!=null&&!lastSettings.enabled){synchronizedTop=text.getTopPixel();synchronizedLeft=text.getHorizontalPixel();}
             int fontHeight = Math.max(1, text.getLineHeight());
             int inset=originalTopMargin+Math.max(1,(int)Math.round(fontHeight*.5));
             appliedTopMargin = padding!=null||alignHighlight?0:inset;
@@ -113,36 +143,34 @@ public final class NotebookSurface implements AutoCloseable {
             updateBackground(s);
             Rectangle area = text.getClientArea();
             if (area.width <= 0 || area.height <= 0) return;
-            PaperRenderer.Layout layout = layout(text, fontHeight, s);
-            if (alignHighlight && highlightColor != null && singleSelectedLine()) {
-                int line = text.getLineAtOffset(text.getCaretOffset());
-                int offset = text.getOffsetAtLine(line), glyphHeight = text.getLineHeight(offset);
-                double shift = fontHeight * s.gap / 100.0 + Math.max(1,fontHeight*s.width/100.0)/2;
-                double first = text.getLocationAtOffset(offset).y + glyphHeight + shift;
-                double last = text.getLinePixel(line + 1) - text.getLineSpacing() + shift;
-                layout = layout.withGeometry(layout.firstTab,layout.secondTab,
-                    s.lines?new PaperRenderer.Highlight(first-glyphHeight-text.getLineSpacing(),last,highlightColor)
-                        :new PaperRenderer.Highlight(text.getLinePixel(line),text.getLinePixel(line+1),highlightColor));
-            }
+            PaperRenderer.Layout layout = currentLayout(s,fontHeight);
             RGB background = text.getBackground().getRGB();
             if(padding!=null)padding.paper(s,layout,background);
             int zoom = text.getMonitor().getZoom();
-            if (layout.equals(lastLayout) && s == lastSettings && background.equals(lastBackground) && zoom == lastZoom) return;
+            PaperRenderer.Layout nextBackgroundKey=layout.backgroundKey(s),nextRulesKey=layout.rulesKey(s);
+            boolean styleChanged=s!=lastSettings||!background.equals(lastBackground)||zoom!=lastZoom;
+            boolean backgroundChanged=image==null||image.isDisposed()||styleChanged||!nextBackgroundKey.equals(backgroundKey);
+            boolean rulesChanged=styleChanged||!nextRulesKey.equals(rulesKey)||(s.lines&&rulesImage==null);
+            lastLayout=layout;
+            // Theme refreshes may clear the widget's image without changing its pixels.
+            if(!backgroundChanged&&text.getBackgroundImage()!=image)text.setBackgroundImage(image);
+            if(!backgroundChanged&&!rulesChanged)return;
             NotebookSettings captured = s;
             PaperRenderer.Layout capturedLayout = layout;
-            Image next = new Image(text.getDisplay(), (ImageDataProvider) requestedZoom ->
-                PaperRenderer.renderBackground(captured, capturedLayout, background, requestedZoom));
-            Image nextRules = null;
+            Image next = null, nextRules = null;
             try {
-                if (s.lines) nextRules = new Image(text.getDisplay(), (ImageDataProvider) requestedZoom ->
+                if(backgroundChanged)next=new Image(text.getDisplay(), (ImageDataProvider) requestedZoom ->
+                    PaperRenderer.renderBackground(captured, capturedLayout, background, requestedZoom));
+                if (rulesChanged&&s.lines) nextRules = new Image(text.getDisplay(), (ImageDataProvider) requestedZoom ->
                     PaperRenderer.renderRules(captured, capturedLayout, background, requestedZoom));
-            } catch (RuntimeException error) { next.dispose(); throw error; }
-            Image previous = image, previousRules = rulesImage; image = next; rulesImage = nextRules;
-            lastLayout = layout; lastSettings = s; lastBackground = background; lastZoom = zoom;
-            text.setBackgroundImage(next);
-            if (previous != null) previous.dispose();
-            if (previousRules != null) previousRules.dispose();
-            for(RulerPaper ruler:rulers.values())ruler.refresh();
+                if(backgroundChanged)text.setBackgroundImage(next);
+            } catch (RuntimeException error) {
+                if(next!=null)next.dispose();if(nextRules!=null)nextRules.dispose();throw error;
+            }
+            if(backgroundChanged){Image previous=image;image=next;if(previous!=null)previous.dispose();}
+            if(rulesChanged){Image previous=rulesImage;rulesImage=nextRules;if(previous!=null)previous.dispose();}
+            backgroundKey=nextBackgroundKey;rulesKey=nextRulesKey;
+            lastSettings = s; lastBackground = background; lastZoom = zoom;
         } catch (RuntimeException error) {
             // A third-party editor must remain usable if its widget cannot accept decoration.
             restore();
@@ -198,6 +226,7 @@ public final class NotebookSurface implements AutoCloseable {
         rulers.get(control).watch(column,model);
     }
     void attachViewer(org.eclipse.jface.text.ITextViewer viewer) {
+        if(this.viewer==null&&viewer!=null){this.viewer=viewer;viewer.addViewportListener(viewport);}
         if(padding!=null||!(viewer instanceof org.eclipse.jface.viewers.Viewer))return;
         org.eclipse.swt.widgets.Control host=((org.eclipse.jface.viewers.Viewer)viewer).getControl();
         if(host instanceof org.eclipse.swt.widgets.Composite&&text.getParent()==host&&((org.eclipse.swt.widgets.Composite)host).getLayout()!=null) {
@@ -208,10 +237,35 @@ public final class NotebookSurface implements AutoCloseable {
     StyledText textWidget(){return text;}
     NotebookSettings currentSettings(){return settings.get();}
     RGB currentBackground(){return text.getBackground().getRGB();}
+    boolean isRulerFrameCurrent() {
+        return !closed&&!text.isDisposed()&&synchronizedLayout!=null
+            &&synchronizedLayout.equals(lastLayout)
+            &&text.getTopPixel()==synchronizedTop&&text.getHorizontalPixel()==synchronizedLeft;
+    }
     PaperRenderer.Layout rulerLayout(org.eclipse.swt.widgets.Control control) {
-        prepare();if(closed||lastLayout==null||!settings.get().enabled)return null;
+        // Every gutter in a committed frame uses the exact geometry drawn by the source.
+        // A first frame may read geometry, but never prepares or changes source resources.
+        NotebookSettings current=settings.get();
+        if(closed||text.isDisposed()||!current.enabled)return null;
+        PaperRenderer.Layout source=isRulerFrameCurrent()?synchronizedLayout
+            :currentLayout(current,Math.max(1,text.getLineHeight()));
         org.eclipse.swt.graphics.Point p=text.getDisplay().map(text,control,0,0);
-        org.eclipse.swt.graphics.Point size=control.getSize();return lastLayout.forRuler(size.x,size.y,p.x,p.y);
+        org.eclipse.swt.graphics.Point size=control.getSize();return source.forRuler(size.x,size.y,p.x,p.y);
+    }
+
+    private PaperRenderer.Layout currentLayout(NotebookSettings s,int fontHeight) {
+        PaperRenderer.Layout result=layout(text,fontHeight,s);
+        if(alignHighlight&&highlightColor!=null&&singleSelectedLine()) {
+            int line=text.getLineAtOffset(text.getCaretOffset());
+            int offset=text.getOffsetAtLine(line),glyphHeight=text.getLineHeight(offset);
+            double shift=fontHeight*s.gap/100.0+Math.max(1,fontHeight*s.width/100.0)/2;
+            double first=text.getLocationAtOffset(offset).y+glyphHeight+shift;
+            double last=text.getLinePixel(line+1)-text.getLineSpacing()+shift;
+            result=result.withGeometry(result.firstTab,result.secondTab,s.lines
+                ?new PaperRenderer.Highlight(first-glyphHeight-text.getLineSpacing(),last,highlightColor)
+                :new PaperRenderer.Highlight(text.getLinePixel(line),text.getLinePixel(line+1),highlightColor));
+        }
+        return result;
     }
 
     public static PaperRenderer.Layout layout(StyledText text, int fontHeight, NotebookSettings s) {
@@ -262,17 +316,21 @@ public final class NotebookSurface implements AutoCloseable {
         if (image != null) { image.dispose(); image = null; }
         if (rulesImage != null) { rulesImage.dispose(); rulesImage = null; }
         if (ownedBackground != null) { ownedBackground.dispose(); ownedBackground = null; }
-        appliedSpacing = -1; appliedTopMargin = -1; lastLayout = null;
+        appliedSpacing = -1; appliedTopMargin = -1; lastLayout=null;synchronizedLayout=null;backgroundKey=null;rulesKey=null;
         for(RulerPaper ruler:rulers.values())ruler.refresh();
     }
 
     @Override public void close() {
         if (closed) return; closed = true;
+        if(viewer!=null){viewer.removeViewportListener(viewport);viewer=null;}
         for(RulerPaper ruler:rulers.values())ruler.close();rulers.clear();
         text.getDisplay().removeFilter(SWT.Paint, paintFilter);
         if (!disposing && !text.isDisposed()) {
             text.removeListener(SWT.Dispose, disposeListener);
             text.removeListener(SWT.Paint, rulesPainter);
+            text.removeListener(SWT.MouseWheel,scroll);text.removeListener(SWT.MouseHorizontalWheel,scroll);
+            if(text.getVerticalBar()!=null)text.getVerticalBar().removeListener(SWT.Selection,scroll);
+            if(text.getHorizontalBar()!=null)text.getHorizontalBar().removeListener(SWT.Selection,scroll);
             if (alignHighlight) text.removeLineBackgroundListener(lineBackground);
             text.setData(DATA_KEY, null);
         }

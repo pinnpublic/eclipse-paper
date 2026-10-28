@@ -23,9 +23,9 @@ $argFile = Join-Path $repoRoot '.build\javac.args'
 [IO.File]::WriteAllLines($argFile, $compilerArgs, [Text.UTF8Encoding]::new($false))
 & $javaCompiler "@$argFile"
 if ($LASTEXITCODE -ne 0) { throw 'Java compilation failed.' }
-$jarPath = Join-Path $output 'dev.eclipseline_1.3.5.jar'
+$jarPath = Join-Path $output 'dev.eclipseline_1.3.12.jar'
 & $jarTool --create --file $jarPath --manifest (Join-Path $repoRoot 'META-INF\MANIFEST.MF') -C $classes . -C $repoRoot plugin.xml -C $repoRoot assets -C $repoRoot LICENSE
 if ($LASTEXITCODE -ne 0) { throw 'Plug-in packaging failed.' }
 $hash = (Get-FileHash -LiteralPath $jarPath -Algorithm SHA256).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText("$jarPath.sha256", "$hash  dev.eclipseline_1.3.5.jar`n", [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText("$jarPath.sha256", "$hash  dev.eclipseline_1.3.12.jar`n", [Text.UTF8Encoding]::new($false))
 Write-Output "Built $jarPath (Java 11 bytecode)"

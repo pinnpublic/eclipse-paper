@@ -1,11 +1,13 @@
 # Paper 사용 매뉴얼
 
+Paper **1.3.12**는 스크롤 중 본문과 줄 번호의 가로줄이 어긋나는 문제를 수정하고, 이미지 변환과 버퍼 생성을 줄였습니다. 줄 번호·접기 영역에도 종이 배경을 연결하며, 오류 표시와 접기 기능은 유지합니다.
+
 ## 설치
 
 ### ZIP 파일
 
 1. **Help → Install New Software… → Add… → Archive…**를 엽니다.
-2. 다운로드한 `paper-update-site-1.3.5.zip`을 선택합니다.
+2. 다운로드한 `paper-update-site-1.3.12.zip`을 선택합니다.
 3. **Paper**를 설치하고 IDE를 재시작합니다.
 
 ### 업데이트 사이트
@@ -17,6 +19,8 @@
 ```text
 https://pinnpublic.github.io/eclipse-paper/updates/
 ```
+
+Paper만 설치·업데이트하려면 설치 화면의 **Contact all update sites during install to find required software**를 해제합니다. 관련 없는 IDE 구성요소가 함께 업데이트되는 것을 피할 수 있습니다.
 
 ## 설정 화면
 
@@ -105,13 +109,14 @@ Eclipse 테마를 전환하면 해당 종이색이 적용됩니다. 선·무늬�
 | 제품 | Eclipse | Java |
 |---|---|---|
 | Spring Tool Suite 3.9.18 | 4.21 | 11 |
-| Eclipse IDE | 4.40 | 21 |
+| Eclipse IDE 2026-06 | 4.40 | 21 |
+| Eclipse IDE 2026-09 | 4.41 | 21 |
 | Spring Tools for Eclipse 5.3.0 | 4.40 | 21 |
 
 운영체제: Windows. 적용 편집기: Java, Text Editor, XML/JSP 소스 페이지.
 
 ---
 
-버전 **1.3.5** · [MIT License](LICENSE) · [변경 내역](CHANGELOG.md) · [문의](https://github.com/pinnpublic/eclipse-paper/issues)
+버전 **1.3.12** · [MIT License](LICENSE) · [변경 내역](CHANGELOG.md) · [문의](https://github.com/pinnpublic/eclipse-paper/issues)
 
 [빌드·검사](DEVELOPMENT.md) · [Marketplace 등록](MARKETPLACE.md)

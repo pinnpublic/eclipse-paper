@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Paper
 Bundle-SymbolicName: dev.eclipseline;singleton:=true
-Bundle-Version: 1.3.5
+Bundle-Version: 1.3.12
 Bundle-Activator: dev.eclipseline.Activator
 Bundle-Vendor: pinnpublic
 Bundle-DocURL: https://github.com/pinnpublic/eclipse-paper

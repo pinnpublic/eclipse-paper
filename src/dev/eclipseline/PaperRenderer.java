@@ -9,6 +9,7 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.util.Arrays;
 import java.util.Objects;
 import org.eclipse.swt.graphics.ImageData;
@@ -58,6 +59,30 @@ public final class PaperRenderer {
             double[] shifted=rules.clone();for(int i=0;i<shifted.length;i++)shifted[i]+=y;
             Highlight h=highlight==null?null:new Highlight(highlight.top+y,highlight.bottom+y,highlight.color);
             return new Layout(width,height,fontHeight,rowHeight,horizontalPixel,originY+y,shifted,firstTab+x,secondTab+x,h,x,y);
+        }
+        /** Geometry that can affect the background raster; scrolling rules are a separate layer. */
+        public Layout backgroundKey(NotebookSettings settings) {
+            return layerKey(settings,0);
+        }
+        /** Geometry that can affect the transparent rule raster, independent of the paper material. */
+        public Layout rulesKey(NotebookSettings settings) {
+            return layerKey(settings,1);
+        }
+        /** Geometry that can affect the combined paper raster used by native ruler overlays. */
+        public Layout fullKey(NotebookSettings settings) {
+            return layerKey(settings,2);
+        }
+        private Layout layerKey(NotebookSettings settings,int layer) {
+            boolean rulesOnly=layer==1;
+            // These paper styles have no vertical pattern. Their texture is fixed to the viewport.
+            double origin=rulesOnly||settings.paper==0||settings.paper==1||settings.paper==7?0:originY;
+            Highlight h=rulesOnly?null:highlight;
+            // Keep a generous guard for stroke snapping around the highlight's bounds.
+            if(h!=null&&(h.bottom < -fontHeight*2.0||h.top > height+fontHeight*2.0))h=null;
+            return new Layout(width,height,fontHeight,rowHeight,horizontalPixel,origin,
+                layer==0||!settings.lines?new double[0]:rules,
+                rulesOnly?0:firstTab,rulesOnly?0:secondTab,h,
+                rulesOnly?0:paperOffsetX,rulesOnly?0:paperOffsetY);
         }
         @Override public boolean equals(Object other) {
             if (!(other instanceof Layout)) return false;
@@ -115,16 +140,26 @@ public final class PaperRenderer {
                 }
             }
         } finally { g.dispose(); }
-        ImageData data = new ImageData(width, height, 32, new PaletteData(0xFF0000, 0xFF00, 0xFF));
+        // Win32 SWT uploads opaque BGR24 and transparent BGRX32 directly. Other
+        // layouts force Image.init to allocate and convert the entire bitmap.
+        boolean transparent = layer == 1;
+        ImageData data = transparent
+            ? new ImageData(width, height, 32, new PaletteData(0xFF00, 0xFF0000, 0xFF000000))
+            : new ImageData(width, height, 24, new PaletteData(0xFF, 0xFF00, 0xFF0000));
         if (layer == 1) data.alphaData = new byte[width * height];
-        int[] row = new int[width];
+        int[] pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
         for (int y = 0; y < height; y++) {
-            image.getRGB(0, y, width, 1, row, 0, width);
+            int at = y * data.bytesPerLine;
             for (int x = 0; x < width; x++) {
-                if (layer == 1) data.alphaData[y * width + x] = (byte) (row[x] >>> 24);
-                row[x] &= 0xFFFFFF;
+                int pixel = pixels[y * width + x];
+                data.data[at++] = (byte) pixel;
+                data.data[at++] = (byte) (pixel >>> 8);
+                data.data[at++] = (byte) (pixel >>> 16);
+                if (transparent) {
+                    at++; // Unused fourth byte stays zero; SWT uses alphaData.
+                    data.alphaData[y * width + x] = (byte) (pixel >>> 24);
+                }
             }
-            data.setPixels(0, y, width, row, 0);
         }
         return data;
     }

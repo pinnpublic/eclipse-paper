@@ -127,7 +127,7 @@ public final class RulerSmokeTest {
             overlay.notifyListeners(SWT.MouseUp,click);
             if(forwarded[0]!=1)throw new AssertionError("Ruler input was not forwarded");
             System.out.println("PASS: ruler mouse input forwarded to the original column");
-            text.setTopIndex(20);surface.refresh();ruler.redraw();ruler.update();overlay.print(gc);actual=capture.getImageData(100);
+            text.setTopIndex(20);surface.refresh();text.update();ruler.redraw();ruler.update();overlay.print(gc);actual=capture.getImageData(100);
             expected=PaperRenderer.render(s,surface.rulerLayout(ruler),s.paperColor,100);
             assertNumber(actual,expected,text.getLinePixel(20),text.getLineHeight());
             System.out.println("PASS: line numbers survive repeated redraws and vertical scrolling");
@@ -168,6 +168,7 @@ public final class RulerSmokeTest {
         if(control instanceof Composite)for(Control child:((Composite)control).getChildren())printTree(root,child,destination);
     }
     private static void assertBaselines(Control overlay,StyledText text,NotebookSurface surface,NotebookSettings settings) {
+        text.update(); // Compare two completed paints; pending-source ordering is tested separately.
         Image numbers=new Image(text.getDisplay(),overlay.getSize().x,overlay.getSize().y);
         Image source=new Image(text.getDisplay(),text.getSize().x,text.getSize().y);
         GC numberGC=new GC(numbers),sourceGC=new GC(source);

@@ -7,6 +7,8 @@ param(
     [string]$RuntimeBase,
     [switch]$KeepOpen,
     [switch]$OpeningOnly,
+    [switch]$GutterOnly,
+    [switch]$ScrollOnly,
     [switch]$ThemeOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -19,11 +21,15 @@ if ($ReuseConfiguration) { $configuration = [IO.Path]::GetFullPath($ReuseConfigu
 $workspace = Join-Path $runtimeRoot 'workspace'
 $classes = Join-Path $runtimeRoot 'test-classes'
 New-Item -ItemType Directory -Force -Path $configuration, $workspace, $classes | Out-Null
-$platformClasspath = (Get-ChildItem -LiteralPath $pluginDir -Filter '*.jar' |
-    Where-Object { $_.Name -match '^(org\.eclipse\.(core|equinox|osgi|jface|swt|ui|text|e4|jdt)|org\.osgi)' } |
-    ForEach-Object { $_.FullName.Replace('\', '/') }) -join ';'
-$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.5.jar'
-Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.5.jar') -Destination $mainJar
+$platformClasspath = (Get-Content -LiteralPath (Join-Path $EclipseHome 'configuration\org.eclipse.equinox.simpleconfigurator\bundles.info') -Encoding UTF8 |
+    Where-Object { $_ -match '^(org\.eclipse\.(core|equinox|osgi|jface|swt|ui|text|e4|jdt)|org\.osgi)' } |
+    ForEach-Object {
+        $location = ($_ -split ',')[2]
+        $path = if ($location -match '^file:') { ([Uri]$location).LocalPath } else { Join-Path $EclipseHome $location }
+        $path.Replace('\', '/')
+    }) -join ';'
+$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.12.jar'
+Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.12.jar') -Destination $mainJar
 $argsForCompiler = @('--release', '11', '-encoding', 'UTF-8', '-d', ('"' + $classes.Replace('\', '/') + '"'),
     '-classpath', ('"' + $mainJar.Replace('\', '/') + ';' + $platformClasspath + '"'))
 $argsForCompiler += Get-ChildItem -LiteralPath (Join-Path $repoRoot 'tests\plugin\src') -Filter '*.java' -Recurse |
@@ -47,7 +53,7 @@ $bundleLines = Get-Content -LiteralPath (Join-Path $EclipseHome 'configuration\o
             $fields -join ','
         }
     }
-$bundleLines += 'dev.eclipseline,1.3.5,' + (ConvertTo-FileUri $mainJar) + ',4,false'
+$bundleLines += 'dev.eclipseline,1.3.12,' + (ConvertTo-FileUri $mainJar) + ',4,false'
 $bundleLines += 'dev.eclipseline.tests,1.0.0,' + (ConvertTo-FileUri $testJar) + ',4,false'
 $bundleInfo = Join-Path $configuration 'bundles.info'
 [IO.File]::WriteAllLines($bundleInfo, $bundleLines, [Text.UTF8Encoding]::new($false))
@@ -76,7 +82,7 @@ $launcher = Get-ChildItem -LiteralPath $pluginDir -Filter 'org.eclipse.equinox.l
 $resultFile = Join-Path $runtimeRoot 'results.txt'
 Write-Output "Test workspace: $workspace"
 Write-Output "Result file: $resultFile"
-& (Join-Path $JdkHome 'bin\java.exe') '-Dnotebook.test.realWorkbench=true' "-Dnotebook.test.themeOnly=$($ThemeOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.openingOnly=$($OpeningOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.result=$resultFile" "-Dnotebook.test.keepOpen=$($KeepOpen.IsPresent.ToString().ToLowerInvariant())" -Xmx1536m -jar $launcher.FullName -install $EclipseHome -configuration $configuration -data $workspace -application org.eclipse.ui.ide.workbench -clean -consoleLog -nosplash
+& (Join-Path $JdkHome 'bin\java.exe') '-Dnotebook.test.realWorkbench=true' "-Dnotebook.test.scrollOnly=$($ScrollOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.gutterOnly=$($GutterOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.themeOnly=$($ThemeOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.openingOnly=$($OpeningOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.result=$resultFile" "-Dnotebook.test.keepOpen=$($KeepOpen.IsPresent.ToString().ToLowerInvariant())" -Xmx1536m -jar $launcher.FullName -install $EclipseHome -configuration $configuration -data $workspace -application org.eclipse.ui.ide.workbench -clean -consoleLog -nosplash
 $runtimeExit = $LASTEXITCODE
 if (Test-Path -LiteralPath $resultFile) {
     $testResultLines = Get-Content -LiteralPath $resultFile -Encoding UTF8

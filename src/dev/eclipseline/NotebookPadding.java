@@ -59,9 +59,10 @@ final class NotebookPadding implements AutoCloseable {
         Rectangle client=text.getClientArea(),area=host.getClientArea();
         Rectangle page=new Rectangle(0,0,Math.min(area.width,offset.x+client.x+client.width),Math.min(area.height,offset.y+client.y+client.height));
         PaperRenderer.Layout layout=source.forRuler(area.width,area.height,offset.x,offset.y);
+        PaperRenderer.Layout key=layout.fullKey(settings);
         RGB chrome=host.getDisplay().getSystemColor(SWT.COLOR_WIDGET_BACKGROUND).getRGB();
         int zoom=host.getMonitor().getZoom();
-        if(layout.equals(lastLayout)&&settings==lastSettings&&color.equals(lastColor)&&zoom==lastZoom&&chrome.equals(lastChrome)&&page.equals(lastPage)
+        if(key.equals(lastLayout)&&settings==lastSettings&&color.equals(lastColor)&&zoom==lastZoom&&chrome.equals(lastChrome)&&page.equals(lastPage)
             &&host.getBackgroundImage()==image&&background!=null&&background.equals(host.getBackground()))return;
         Image next=new Image(host.getDisplay(),(ImageDataProvider) z->backdrop(settings,layout,color,chrome,page,z));
         if(background!=null&&!background.equals(host.getBackground()))originalBackground=host.getBackground();
@@ -72,7 +73,7 @@ final class NotebookPadding implements AutoCloseable {
             if(previous!=null)previous.dispose();
         } else if(!background.equals(host.getBackground()))host.setBackground(background);
         host.setBackgroundImage(next);if(image!=null)image.dispose();image=next;
-        lastLayout=layout;lastSettings=settings;lastColor=color;lastZoom=zoom;lastChrome=chrome;lastPage=page;
+        lastLayout=key;lastSettings=settings;lastColor=color;lastZoom=zoom;lastChrome=chrome;lastPage=page;
     }
     static ImageData backdrop(NotebookSettings settings,PaperRenderer.Layout layout,RGB paper,RGB chrome,Rectangle page,int zoom) {
         ImageData data=PaperRenderer.render(settings,layout,paper,zoom);
