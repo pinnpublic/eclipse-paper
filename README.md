@@ -4,6 +4,15 @@ Paper **1.3.13**은 스크롤바 오른쪽 표시 영역을 라이트·다크 �
 
 ## 설치
 
+### Eclipse Marketplace
+
+[Paper 마켓플레이스 페이지](https://marketplace.eclipse.org/content/paper)
+
+1. Eclipse에서 **Help → Eclipse Marketplace…**를 엽니다.
+2. 검색창에 `paper`를 입력하고 검색합니다.
+3. 게시자가 **pinnpublic**인 **Paper** 항목의 **Install**을 누릅니다.
+4. 설치 안내에 따라 라이선스에 동의하고 설치를 완료한 뒤 IDE를 재시작합니다.
+
 ### ZIP 파일
 
 1. **Help → Install New Software… → Add… → Archive…**를 엽니다.
