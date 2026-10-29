@@ -18,8 +18,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build-update-site.ps1 -Ecl
 
 | 결과 | 경로 |
 |---|---|
-| 플러그인 JAR | `dist/dev.eclipseline_1.3.13.jar` |
-| 설치 ZIP | `dist/paper-update-site-1.3.13.zip` |
+| 플러그인 JAR | `dist/dev.eclipseline_1.3.14.jar` |
+| 설치 ZIP | `dist/paper-update-site-1.3.14.zip` |
 | SHA-256 | 각 파일의 `.sha256` |
 | 온라인 p2 저장소 | `docs/updates/` |
 
@@ -45,6 +45,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\test-runtime.ps1 -EclipseH
 | `test-runtime.ps1 -GutterOnly` | 큰 글꼴·선택·편집 후 접기 영역의 종이 연결과 실제 접기·펼치기 클릭 |
 | `test-runtime.ps1 -GutterOnly -ThemeOnly` | 표시 정리·원본 모델 복원 검사와 라이트·다크 테마·오류 아이콘 회귀 검사 |
 | `test-runtime.ps1 -ScrollOnly` | 긴 문서·큰 글꼴에서 실제 Windows 휠 입력 후 번호와 본문 픽셀 기준선 비교 |
+| `test-runtime.ps1 -FindOnly` | 새 인라인 검색창의 유휴 크기·위치·표시 안정성, 검색 입력·바꾸기 펼침·창 크기·글꼴·줄 번호 폭 변경·다시 열기 (Eclipse 4.40/4.41) |
 
 1.3.12의 `test-ruler.ps1`에는 본문/줄 번호의 그리기 순서가 바뀌어도 같은 프레임을 유지하는 검사,
 정수 행 스크롤의 이미지 재사용, 부분 행의 가로줄 갱신, 테마가 지운 이미지의 재부착,

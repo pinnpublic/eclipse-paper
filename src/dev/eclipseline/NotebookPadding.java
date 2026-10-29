@@ -26,6 +26,8 @@ final class NotebookPadding implements AutoCloseable {
     private Rectangle lastPage;
     private int lastZoom,height;
     private boolean layingOut,closed;
+    private final java.util.Map<Control,Rectangle> layoutBounds=new java.util.IdentityHashMap<>();
+    private java.util.List<Object> lastLayoutInputs;
     private final Layout insetLayout=new Layout() {
         @Override protected Point computeSize(Composite composite,int width,int wantedHeight,boolean flush) {
             composite.setLayout(originalLayout);
@@ -37,23 +39,58 @@ final class NotebookPadding implements AutoCloseable {
         @Override protected void layout(Composite composite,boolean flush) {
             if(layingOut)return;layingOut=true;composite.setLayout(originalLayout);
             try {
-                composite.layout(flush);
-                if(height>0)for(Control child:composite.getChildren()) {
-                    Rectangle bounds=child.getBounds();
-                    if(bounds.width<=0||bounds.height<=0)continue;
-                    int trim=child==text||bounds.height>=Math.max(1,composite.getClientArea().height/2)?height:0;
-                    child.setBounds(bounds.x,bounds.y+height,bounds.width,Math.max(0,bounds.height-trim));
+                layoutBounds.keySet().removeIf(Control::isDisposed);
+                java.util.List<Object> inputs=layoutInputs(flush);
+                boolean floating=false,unchanged=true;
+                for(Control child:composite.getChildren()) {
+                    Rectangle previous=layoutBounds.get(child);
+                    if(previous==null)floating=true;
+                    else if(!previous.equals(child.getBounds()))unchanged=false;
                 }
+                // Inline Find/Replace requests its parent's layout after each source resize.
+                // Reapplying full-height bounds followed by the inset emits two more resizes
+                // forever. Let a floating control lay out without resizing a settled viewer.
+                if(floating&&unchanged&&inputs.equals(lastLayoutInputs))return;
+                java.util.Map<Control,Rectangle> before=new java.util.IdentityHashMap<>();
+                for(Control child:composite.getChildren())before.put(child,child.getBounds());
+                composite.layout(flush);
+                for(Control child:composite.getChildren()) {
+                    Rectangle bounds=child.getBounds();
+                    // SourceViewer's layout leaves overlays alone; preserve their geometry.
+                    if(!layoutBounds.containsKey(child)&&bounds.equals(before.get(child)))continue;
+                    if(height>0&&bounds.width>0&&bounds.height>0) {
+                        int trim=child==text||bounds.height>=Math.max(1,composite.getClientArea().height/2)?height:0;
+                        child.setBounds(bounds.x,bounds.y+height,bounds.width,Math.max(0,bounds.height-trim));
+                    }
+                    layoutBounds.put(child,child.getBounds());
+                }
+                lastLayoutInputs=layoutInputs(false);
             } finally {if(!composite.isDisposed())composite.setLayout(this);layingOut=false;}
         }
     };
     NotebookPadding(Composite host,StyledText text) {
         this.host=host;this.text=text;display=host.getDisplay();originalLayout=host.getLayout();
         originalImage=host.getBackgroundImage();originalBackground=host.getBackground();
+        for(Control child:host.getChildren())layoutBounds.put(child,child.getBounds());
         host.setLayout(insetLayout);
         display.addFilter(SWT.Paint,chromePaint);
     }
     int height(){return height;}
+    private java.util.List<Object> layoutInputs(boolean flush) {
+        java.util.List<Object> inputs=new java.util.ArrayList<>();
+        inputs.add(host.getClientArea());inputs.add(height);
+        // The delegate's preferred size includes the ruler's requested width. Merely
+        // comparing actual bounds would miss line-number width and font changes.
+        inputs.add(host.computeSize(SWT.DEFAULT,SWT.DEFAULT,flush));
+        inputs.add(text.computeTrim(0,0,0,0));
+        inputs.add(text.getHorizontalBar()!=null&&text.getHorizontalBar().getVisible());
+        inputs.add(text.getVerticalBar()!=null&&text.getVerticalBar().getVisible());
+        for(Control child:host.getChildren())if(layoutBounds.containsKey(child)) {
+            inputs.add(child);inputs.add(child.getVisible());inputs.add(child.getFont());
+            inputs.add(child.computeSize(SWT.DEFAULT,SWT.DEFAULT,flush));
+        }
+        return inputs;
+    }
     void restored(){if(!closed&&!host.isDisposed()){lastLayout=null;host.layout(true,true);host.redraw(0,0,host.getClientArea().width,host.getClientArea().height,true);}}
     void setHeight(int value) {
         if(closed||host.isDisposed())return;

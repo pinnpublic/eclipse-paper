@@ -9,6 +9,7 @@ param(
     [switch]$OpeningOnly,
     [switch]$GutterOnly,
     [switch]$ScrollOnly,
+    [switch]$FindOnly,
     [switch]$ThemeOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -28,8 +29,8 @@ $platformClasspath = (Get-Content -LiteralPath (Join-Path $EclipseHome 'configur
         $path = if ($location -match '^file:') { ([Uri]$location).LocalPath } else { Join-Path $EclipseHome $location }
         $path.Replace('\', '/')
     }) -join ';'
-$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.13.jar'
-Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.13.jar') -Destination $mainJar
+$mainJar = Join-Path $runtimeRoot 'dev.eclipseline_1.3.14.jar'
+Copy-Item -LiteralPath (Join-Path $repoRoot 'dist\dev.eclipseline_1.3.14.jar') -Destination $mainJar
 $argsForCompiler = @('--release', '11', '-encoding', 'UTF-8', '-d', ('"' + $classes.Replace('\', '/') + '"'),
     '-classpath', ('"' + $mainJar.Replace('\', '/') + ';' + $platformClasspath + '"'))
 $argsForCompiler += Get-ChildItem -LiteralPath (Join-Path $repoRoot 'tests\plugin\src') -Filter '*.java' -Recurse |
@@ -53,7 +54,7 @@ $bundleLines = Get-Content -LiteralPath (Join-Path $EclipseHome 'configuration\o
             $fields -join ','
         }
     }
-$bundleLines += 'dev.eclipseline,1.3.13,' + (ConvertTo-FileUri $mainJar) + ',4,false'
+$bundleLines += 'dev.eclipseline,1.3.14,' + (ConvertTo-FileUri $mainJar) + ',4,false'
 $bundleLines += 'dev.eclipseline.tests,1.0.0,' + (ConvertTo-FileUri $testJar) + ',4,false'
 $bundleInfo = Join-Path $configuration 'bundles.info'
 [IO.File]::WriteAllLines($bundleInfo, $bundleLines, [Text.UTF8Encoding]::new($false))
@@ -82,7 +83,7 @@ $launcher = Get-ChildItem -LiteralPath $pluginDir -Filter 'org.eclipse.equinox.l
 $resultFile = Join-Path $runtimeRoot 'results.txt'
 Write-Output "Test workspace: $workspace"
 Write-Output "Result file: $resultFile"
-& (Join-Path $JdkHome 'bin\java.exe') '-Dnotebook.test.realWorkbench=true' "-Dnotebook.test.scrollOnly=$($ScrollOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.gutterOnly=$($GutterOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.themeOnly=$($ThemeOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.openingOnly=$($OpeningOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.result=$resultFile" "-Dnotebook.test.keepOpen=$($KeepOpen.IsPresent.ToString().ToLowerInvariant())" -Xmx1536m -jar $launcher.FullName -install $EclipseHome -configuration $configuration -data $workspace -application org.eclipse.ui.ide.workbench -clean -consoleLog -nosplash
+& (Join-Path $JdkHome 'bin\java.exe') '-Dnotebook.test.realWorkbench=true' "-Dnotebook.test.findOnly=$($FindOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.scrollOnly=$($ScrollOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.gutterOnly=$($GutterOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.themeOnly=$($ThemeOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.openingOnly=$($OpeningOnly.IsPresent.ToString().ToLowerInvariant())" "-Dnotebook.test.result=$resultFile" "-Dnotebook.test.keepOpen=$($KeepOpen.IsPresent.ToString().ToLowerInvariant())" -Xmx1536m -jar $launcher.FullName -install $EclipseHome -configuration $configuration -data $workspace -application org.eclipse.ui.ide.workbench -clean -consoleLog -nosplash
 $runtimeExit = $LASTEXITCODE
 if (Test-Path -LiteralPath $resultFile) {
     $testResultLines = Get-Content -LiteralPath $resultFile -Encoding UTF8

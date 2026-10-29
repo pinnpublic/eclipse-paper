@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.14 — 2026-10-29
+
+- Stop the inline Find/Replace overlay from repeatedly resizing the source viewer and moving its search bar. Keep settled viewer bounds during overlay layout requests while still reacting to window, font, scrollbar and ruler size changes.
+- Leave floating controls at their native positions instead of shifting them with the notebook's top inset.
+- Add a real-workbench inline search regression covering idle layout events, query input, Replace expansion, resizing, font and line-number width changes, and reopening.
+
 ## 1.3.13 — 2026-10-28
 
 - Keep the overview ruler and scrollbar surroundings in the editor's light/dark CSS theme color instead of inheriting the notebook paper background.

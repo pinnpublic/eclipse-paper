@@ -8,7 +8,7 @@ $repoRoot = $PSScriptRoot
 $javaTool = if ($JdkHome) { Join-Path $JdkHome 'bin\java.exe' } else { (Get-Command java).Source }
 $jarTool = Join-Path (Split-Path $javaTool) 'jar.exe'
 $plugins = Join-Path $EclipseHome 'plugins'
-$mainJar = Join-Path $repoRoot 'dist\dev.eclipseline_1.3.13.jar'
+$mainJar = Join-Path $repoRoot 'dist\dev.eclipseline_1.3.14.jar'
 if (!(Test-Path -LiteralPath $mainJar)) { throw 'Run build.ps1 first.' }
 $work = Join-Path ([IO.Path]::GetTempPath()) ('eclipse-notebook-p2-' + [Guid]::NewGuid().ToString('N'))
 $stage = Join-Path $work 'stage'
@@ -16,7 +16,7 @@ $repository = Join-Path $work 'repository'
 $configuration = Join-Path $work 'configuration'
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'plugins'), (Join-Path $stage 'features'), $repository, $configuration | Out-Null
 Copy-Item -LiteralPath $mainJar -Destination (Join-Path $stage 'plugins')
-$featureJar = Join-Path $stage 'features\dev.eclipseline.feature_1.3.13.jar'
+$featureJar = Join-Path $stage 'features\dev.eclipseline.feature_1.3.14.jar'
 & $jarTool --create --file $featureJar -C (Join-Path $repoRoot 'feature') feature.xml
 if ($LASTEXITCODE -ne 0) { throw 'Feature packaging failed.' }
 
@@ -53,13 +53,13 @@ if ($LASTEXITCODE -ne 0) { throw 'p2 feature/bundle publishing failed.' }
 & $javaTool @launcherArgs -application org.eclipse.equinox.p2.publisher.CategoryPublisher -metadataRepository $repositoryUri -categoryDefinition (ConvertTo-FileUri (Join-Path $repoRoot 'feature\category.xml')) -categoryQualifier dev.eclipseline.category -compress
 if ($LASTEXITCODE -ne 0) { throw 'p2 category publishing failed.' }
 Copy-Item -LiteralPath (Join-Path $repoRoot 'feature\category.xml') -Destination (Join-Path $repository 'category.xml')
-$zipPath = Join-Path $repoRoot 'dist\paper-update-site-1.3.13.zip'
+$zipPath = Join-Path $repoRoot 'dist\paper-update-site-1.3.14.zip'
 # Windows PowerShell Compress-Archive writes backslashes into ZIP member names.
 # p2 resolves artifact URLs with '/', so package with the JDK ZIP/JAR writer.
 & $jarTool --create --no-manifest --file $zipPath -C $repository .
 if ($LASTEXITCODE -ne 0) { throw 'Update-site ZIP packaging failed.' }
 $entries = & $jarTool --list --file $zipPath
-foreach ($entry in @('plugins/dev.eclipseline_1.3.13.jar', 'features/dev.eclipseline.feature_1.3.13.jar')) {
+foreach ($entry in @('plugins/dev.eclipseline_1.3.14.jar', 'features/dev.eclipseline.feature_1.3.14.jar')) {
     if ($entries -cnotcontains $entry) { throw "Missing exact ZIP entry: $entry" }
 }
 if ($entries | Where-Object { $_.Contains('\') }) { throw 'ZIP member names must use forward slashes.' }
@@ -81,7 +81,7 @@ if ($listExit -ne 0 -or !(($listOutput -join "`n") -match 'dev\.eclipseline\.fea
 $mirror = Join-Path $work 'collected-artifacts'
 & $javaTool @launcherArgs -application org.eclipse.equinox.p2.artifact.repository.mirrorApplication -source $archiveUri -destination (ConvertTo-FileUri $mirror) -verbose
 if ($LASTEXITCODE -ne 0) { throw 'p2 could not collect the artifacts from the finished ZIP.' }
-foreach ($entry in @('plugins/dev.eclipseline_1.3.13.jar', 'features/dev.eclipseline.feature_1.3.13.jar')) {
+foreach ($entry in @('plugins/dev.eclipseline_1.3.14.jar', 'features/dev.eclipseline.feature_1.3.14.jar')) {
     $collected = Join-Path $mirror $entry
     if (!(Test-Path -LiteralPath $collected)) { throw "p2 did not collect: $entry" }
     if ((Get-FileHash -LiteralPath $collected -Algorithm SHA256).Hash -ne

@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = $PSScriptRoot
 $compiler = if ($JdkHome) { Join-Path $JdkHome 'bin\javac.exe' } else { (Get-Command javac).Source }
 $java = Join-Path (Split-Path $compiler) 'java.exe'
-$mainJar = Join-Path $repoRoot 'dist\dev.eclipseline_1.3.13.jar'
+$mainJar = Join-Path $repoRoot 'dist\dev.eclipseline_1.3.14.jar'
 $classes = Join-Path $repoRoot '.build\rendering-tests'
 New-Item -ItemType Directory -Force -Path $classes | Out-Null
 $platform = (Get-ChildItem -LiteralPath (Join-Path $EclipseHome 'plugins') -Filter '*.jar' |

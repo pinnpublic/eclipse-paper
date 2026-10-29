@@ -66,6 +66,7 @@ public final class RuntimeTests implements IStartup {
         IWorkbench workbench = PlatformUI.getWorkbench();
         if (workbench.getIntroManager().getIntro() != null) workbench.getIntroManager().closeIntro(workbench.getIntroManager().getIntro());
         IWorkbenchPage page = workbench.showPerspective("dev.eclipseline.tests.perspective", workbench.getActiveWorkbenchWindow());
+        if(Boolean.getBoolean("notebook.test.findOnly")){findOverlayTests(page);return;}
         if(Boolean.getBoolean("notebook.test.scrollOnly")){wheelTests(page);if(!Boolean.getBoolean("notebook.test.gutterOnly")&&!Boolean.getBoolean("notebook.test.themeOnly"))return;}
         if(Boolean.getBoolean("notebook.test.gutterOnly")){gutterTests(page);if(Boolean.getBoolean("notebook.test.themeOnly"))themeTests(page);return;}
         if(Boolean.getBoolean("notebook.test.themeOnly")){themeTests(page);return;}
@@ -156,6 +157,78 @@ public final class RuntimeTests implements IStartup {
         openingTests(page);
         themeTests(page);
         gutterTests(page);
+    }
+
+    private void findOverlayTests(IWorkbenchPage page)throws Exception {
+        org.eclipse.core.runtime.preferences.InstanceScope.INSTANCE.getNode("org.eclipse.ui.editors").putBoolean("useFindReplaceOverlay",true);
+        IProject project=ResourcesPlugin.getWorkspace().getRoot().getProject("FindOverlayRegression");project.create(null);project.open(null);
+        IFile file=file(project,"find.txt","alpha beta gamma\n".repeat(150));
+        IEditorPart editor=page.openEditor(new FileEditorInput(file),EditorsUI.DEFAULT_TEXT_EDITOR_ID);
+        StyledText text=widget(editor);await(()->attached(text));pump();
+        Rectangle originalBounds=text.getBounds();
+        ITextEditor textEditor=(ITextEditor)editor;
+        org.eclipse.jface.action.IAction action=textEditor.getAction(org.eclipse.ui.texteditor.ITextEditorActionConstants.FIND);
+        action.run();pump();
+        Object overlay=field(action,"overlay",Object.class);
+        check(overlay!=null,"Find/Replace opens the native inline overlay");
+        Composite container=field(overlay,"containerControl",Composite.class);
+        int[] resizes={0},moves={0},visibility={0};
+        Listener resized=e->resizes[0]++,moved=e->moves[0]++,shown=e->visibility[0]++;
+        text.addListener(SWT.Resize,resized);container.addListener(SWT.Move,moved);
+        container.addListener(SWT.Show,shown);container.addListener(SWT.Hide,shown);
+        try {
+            for(int i=0;i<5;i++)pump();
+            check(resizes[0]<=2&&moves[0]<=2&&visibility[0]==0,"idle search settles: source resizes="+resizes[0]+", overlay moves="+moves[0]+", visibility changes="+visibility[0]);
+            check(container.isVisible(),"inline search remains visible");
+            check(text.getBounds().equals(originalBounds),"opening search preserves the notebook inset and editor bounds");
+            Text search=field(field(overlay,"searchBar",Object.class),"textBar",Text.class);
+            search.setText("gamma");pump();pump();
+            check(text.getSelectionText().equals("gamma"),"native inline search selects matching document text");
+            assertFindSettled(text,container,"after typing a query");
+            java.lang.reflect.Method replace=overlay.getClass().getDeclaredMethod("setReplaceVisible",boolean.class);replace.setAccessible(true);
+            replace.invoke(overlay,true);pump();assertFindSettled(text,container,"with Replace expanded");
+            replace.invoke(overlay,false);pump();assertFindSettled(text,container,"with Replace collapsed");
+            Shell shell=page.getWorkbenchWindow().getShell();Point shellSize=shell.getSize();
+            try {
+                shell.setSize(shellSize.x-120,shellSize.y-80);pump();
+                check(text.getBounds().width!=originalBounds.width,"real window resizing still updates the editor with search open");
+                assertFindSettled(text,container,"after window resizing");
+            } finally {shell.setSize(shellSize);pump();}
+            Font originalFont=text.getFont(),largeFont=new Font(display,"Consolas",24,SWT.NORMAL);
+            try {text.setFont(largeFont);pump();assertFindSettled(text,container,"after increasing the font");}
+            finally {text.setFont(originalFont);pump();largeFont.dispose();}
+            Control ruler=editor.getAdapter(org.eclipse.jface.text.source.IVerticalRulerInfo.class).getControl();
+            int rulerWidth=ruler.getSize().x;
+            try {
+                document(editor).set("alpha beta gamma\n".repeat(1500));pump();pump();
+                check(ruler.getSize().x>rulerWidth,"line numbers grow from three to four digits with search open");
+                assertFindSettled(text,container,"after line-number width changes");
+            } finally {document(editor).set("alpha beta gamma\n".repeat(150));textEditor.doRevertToSaved();pump();}
+            captureTree(text.getParent(),"find-overlay.png");
+            check(document(editor).get().equals("alpha beta gamma\n".repeat(150))&&!editor.isDirty(),"opening search preserves source text and dirty state");
+            for(int cycle=0;cycle<3;cycle++) {
+                overlay.getClass().getMethod("close").invoke(overlay);pump();action.run();pump();
+                assertFindSettled(text,container,"after closing and reopening search "+cycle);
+            }
+        } finally {
+            text.removeListener(SWT.Resize,resized);container.removeListener(SWT.Move,moved);
+            container.removeListener(SWT.Show,shown);container.removeListener(SWT.Hide,shown);
+            overlay.getClass().getMethod("close").invoke(overlay);pump();page.closeEditor(editor,false);
+        }
+    }
+
+    private void assertFindSettled(StyledText text,Composite container,String scenario) {
+        pump();int[] resizes={0},moves={0},visibility={0};
+        Listener resized=e->resizes[0]++,moved=e->moves[0]++,shown=e->visibility[0]++;
+        text.addListener(SWT.Resize,resized);container.addListener(SWT.Move,moved);
+        container.addListener(SWT.Show,shown);container.addListener(SWT.Hide,shown);
+        try {
+            for(int i=0;i<3;i++)pump();
+            check(resizes[0]==0&&moves[0]==0&&visibility[0]==0&&container.isVisible(),scenario+": source resizes="+resizes[0]+", overlay moves="+moves[0]+", visibility changes="+visibility[0]);
+        } finally {
+            text.removeListener(SWT.Resize,resized);container.removeListener(SWT.Move,moved);
+            container.removeListener(SWT.Show,shown);container.removeListener(SWT.Hide,shown);
+        }
     }
 
     private void wheelTests(IWorkbenchPage page)throws Exception {
